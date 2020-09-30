@@ -769,7 +769,7 @@ SMCom_Status_t SMCom<T>::finalize_queue(){
 
 
 template<typename T>
-void SMCom<T>::set_fixed_packet_size(uint8_t packet_size){
+void SMCom<T>::set_fixed_packet_size(uint16_t packet_size){
 	this->packet_size = packet_size;
 }
 

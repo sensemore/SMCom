@@ -258,7 +258,6 @@ public:
 
 	static const uint8_t HEADER_SIZE = sizeof(CT)+1;
 	static const uint8_t MAX_MSG_LENGTH = 0xFF;
-	uint8_t packet_size = 0;
 
 private:
 
@@ -319,6 +318,8 @@ private:
 
 	message_flags rxflag;
 	message_flags txflag;
+
+	uint16_t packet_size = 0;
 
 	uint16_t last_crc;
 
