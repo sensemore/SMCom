@@ -14,7 +14,7 @@ template<>
 SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
 	//rx_buffer = (uint8_t*)malloc(_rx_buf_size);
 	rx_buffer = new uint8_t[rx_buf_size];
-	tx_buffer = (tx_buf_size > 0) new uint8_t[tx_buf_size] : NULL;
+	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
 
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
@@ -111,7 +111,7 @@ SMCom<SMCOM_PRIVATE>::~SMCom(){
 template<>
 SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	rx_buffer = new uint8_t[rx_buf_size];
-	tx_buffer = (tx_buf_size > 0) new uint8_t[tx_buf_size] : NULL;
+	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
 
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
