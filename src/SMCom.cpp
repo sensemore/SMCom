@@ -1,14 +1,7 @@
-#ifndef STM32G431xx
-#include "SM_Communication.h"
-#else
-#include "../../../../shared/SM_Communication/include/SM_Communication.h"
-#endif
-
-
-
+#include "SMCom.h"
 
 //======================================================================================
-//SM_COMMUNICATION_PRIVATE
+//SMCOM_PRIVATE
 // +----------+-----------+-------+----------+----+---------+
 // |          |           |       |          |    |         |
 // |          |           |       |          |    |         |
@@ -18,7 +11,7 @@
 // +----------+-----------+-------+----------+----+---------+
 
 template<>
-SM_Communication<SM_COMMUNICATION_PRIVATE>::SM_Communication(uint16_t _rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
+SMCom<SMCOM_PRIVATE>::SMCom(uint16_t _rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
 	//rx_buffer = (uint8_t*)malloc(_rx_buf_size);
 	rx_buffer = new uint8_t[_rx_buf_size];
 	rx_buf_size = _rx_buf_size;
@@ -29,14 +22,14 @@ SM_Communication<SM_COMMUNICATION_PRIVATE>::SM_Communication(uint16_t _rx_buf_si
 
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::write(SM_Communication_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len){
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
 	return common_write(buffer,len);
 }
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::start_write_queue(SM_Communication_message_types t, uint8_t message_id, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len){
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
 	com_packet.data_len = len;
@@ -44,33 +37,34 @@ SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::start_writ
 }
 
 template <>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 	com_packet.message_id = message_id;
 	return common_request(buffer,len,timeout,fptr);
 }
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
-	com_packet.message_type = SM_Communication_message_types::RESPONSE;
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = message_id;
 	return common_write(buffer,len);
 }
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::respond(const SM_COMMUNICATION_PRIVATE * inc_packet, const uint8_t * buffer, uint8_t len){
-	com_packet.message_type = SM_Communication_message_types::RESPONSE;
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, const uint8_t * buffer, uint8_t len){
+	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
 	return common_write(buffer,len);
 }
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PRIVATE>::additional_buffer_check(){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::additional_buffer_check(){
 	//Nothing to check, there is no receiver/transmitter id in this type of a communicaiton
-	return SM_COMMUNICATION_STATUS_SUCCESS;
+	return SMCOM_STATUS_SUCCESS;
 }
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
-typename SM_Communication<SM_COMMUNICATION_PRIVATE>::request_list_iterator SM_Communication<SM_COMMUNICATION_PRIVATE>::check_incoming_response(SM_COMMUNICATION_PRIVATE * inc_packet){
+typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check_incoming_response(SMCOM_PRIVATE * inc_packet){
 	//packet is (response) from another device, we'll check did we have a request for this response
 	//For private communication only message_id matters
 	//Iterate in the list and check their message id
@@ -86,19 +80,18 @@ typename SM_Communication<SM_COMMUNICATION_PRIVATE>::request_list_iterator SM_Co
 			nextit = std::next(it);			
 		}while(nextit != request_list.end());
 	}
-
-	
 	return 	request_list.end();	
 }
+#endif
 
 
 template<>
-SM_Communication<SM_COMMUNICATION_PRIVATE>::~SM_Communication(){
+SMCom<SMCOM_PRIVATE>::~SMCom(){
 	delete[] rx_buffer;
 }
 
 //===================================================================================================================================================================================
-//SM_COMMUNICATION_PUBLIC
+//SMCOM_PUBLIC
 // +----------+-----------+--------+-----------+-------+----------+----+---------+
 // |          |           |        |           |       |          |    |         |
 // |          |           |        |           |       |          |    |         |
@@ -110,7 +103,7 @@ SM_Communication<SM_COMMUNICATION_PRIVATE>::~SM_Communication(){
 
 
 template<>
-SM_Communication<SM_COMMUNICATION_PUBLIC>::SM_Communication(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
+SMCom<SMCOM_PUBLIC>::SMCom(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	rx_buffer = new uint8_t[_rx_buf_size];
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
@@ -120,13 +113,13 @@ SM_Communication<SM_COMMUNICATION_PUBLIC>::SM_Communication(uint16_t _rx_buf_siz
 }
 
 template<>
-void SM_Communication<SM_COMMUNICATION_PUBLIC>::assign_new_id(uint8_t id){
+void SMCom<SMCOM_PUBLIC>::assign_new_id(uint8_t id){
 	com_packet.transmitter_id = id;
 }
 
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::write(SM_Communication_message_types t, uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
 
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
@@ -136,7 +129,7 @@ SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::write(SM_Co
 }
 
 template <>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::request(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 	
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
@@ -145,18 +138,18 @@ SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::request(uin
 
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::respond(const SM_COMMUNICATION_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
 
-	com_packet.message_type = SM_Communication_message_types::RESPONSE;
+	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
 	com_packet.receiver_id = inc_packet->transmitter_id;	
 	return common_write(buffer,len);
 }
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
 
-	com_packet.message_type = SM_Communication_message_types::RESPONSE;
+	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
 	
@@ -166,7 +159,7 @@ SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::respond(uin
 
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::start_write_queue(SM_Communication_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len){
 
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
@@ -177,22 +170,22 @@ SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::start_write
 
 
 template<>
-SM_Communication_Status_t SM_Communication<SM_COMMUNICATION_PUBLIC>::additional_buffer_check(){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::additional_buffer_check(){
 	//Check that is this message for us, we are just gonna check receiver id, which must be our ID
 	
-	SM_COMMUNICATION_PUBLIC * ptr = (SM_COMMUNICATION_PUBLIC *) (rx_buffer+1);
+	SMCOM_PUBLIC * ptr = (SMCOM_PUBLIC *) (rx_buffer+1);
 
-	if(ptr->receiver_id == com_packet.transmitter_id || ptr->receiver_id == SM_Communication_headers::PUBLIC_ID_4BIT){
-		return SM_COMMUNICATION_STATUS_SUCCESS;	
+	if(ptr->receiver_id == com_packet.transmitter_id || ptr->receiver_id == SMCom_headers::PUBLIC_ID_4BIT){
+		return SMCOM_STATUS_SUCCESS;	
 	}
 
-	return SM_COMMUNICATION_STATUS_PORT_BUSY;
+	return SMCOM_STATUS_PORT_BUSY;
 	
 }
 
-
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
-typename SM_Communication<SM_COMMUNICATION_PUBLIC>::request_list_iterator SM_Communication<SM_COMMUNICATION_PUBLIC>::check_incoming_response(SM_COMMUNICATION_PUBLIC * inc_packet){
+typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_incoming_response(SMCOM_PUBLIC * inc_packet){
 	//packet is (response) from another device, we'll check did we have a request for this response
 	//Iterate in the list and check their message id + their transmitter id must be our request receiver id
 	printf("Incoming packet transmitter_id %d | receiver_id %d\n",inc_packet->transmitter_id,inc_packet->receiver_id );
@@ -211,16 +204,16 @@ typename SM_Communication<SM_COMMUNICATION_PUBLIC>::request_list_iterator SM_Com
 	}
 	return 	request_list.end();	
 }
-
+#endif
 
 template<>
-SM_Communication<SM_COMMUNICATION_PUBLIC>::~SM_Communication(){
+SMCom<SMCOM_PUBLIC>::~SMCom(){
 	delete[] rx_buffer;
 }
 
 
 //======================================================================================
-//SM_COMMUNICATION_PUBLIC_8BIT_ADDRESS
+//SMCOM_PUBLIC_8BIT_ADDRESS
 // +----------+-----------+--------+-----------+-------+----------+----+---------+
 // |          |           |        |           |       |          |    |         |
 // |          |           |        |           |       |          |    |         |
@@ -231,20 +224,20 @@ SM_Communication<SM_COMMUNICATION_PUBLIC>::~SM_Communication(){
 
 /*
 template<>
-SM_Communication<SM_COMMUNICATION_PUBLIC_8BIT_ADDRESS>::SM_Communication(uint16_t _rx_buf_size, uint8_t id){
+SMCom<SMCOM_PUBLIC_8BIT_ADDRESS>::SMCom(uint16_t _rx_buf_size, uint8_t id){
 	rx_buffer = new uint8_t[_rx_buf_size];
 	//rx_buffer = (uint8_t*)malloc(rx_buf_size);
 	com_packet.transmitter_id = id;
 }
 
 template<>
-SM_Communication<SM_COMMUNICATION_PUBLIC_8BIT_ADDRESS>::~SM_Communication(){
+SMCom<SMCOM_PUBLIC_8BIT_ADDRESS>::~SMCom(){
 	delete[] rx_buffer;
 }*/
 
 
 //======================================================================================
-//SM_COMMUNICATION_ONLY_MASTER
+//SMCOM_ONLY_MASTER
 // +----------+-----------+--------+-------+----------+----+---------+
 // |          |           |        |       |          |    |         |
 // |          |           |        |       |          |    |         |
@@ -255,11 +248,11 @@ SM_Communication<SM_COMMUNICATION_PUBLIC_8BIT_ADDRESS>::~SM_Communication(){
 
 /*
 template<>
-SM_Communication<SM_COMMUNICATION_ONLY_MASTER>::SM_Communication(uint16_t _rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
+SMCom<SMCOM_ONLY_MASTER>::SMCom(uint16_t _rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
 	rx_buffer = new uint8_t[_rx_buf_size];
 }
 template<>
-SM_Communication<SM_COMMUNICATION_ONLY_MASTER>::~SM_Communication(){
+SMCom<SMCOM_ONLY_MASTER>::~SMCom(){
 	delete[] rx_buffer;
 }
 
@@ -267,15 +260,17 @@ SM_Communication<SM_COMMUNICATION_ONLY_MASTER>::~SM_Communication(){
 
 
 //COMMON
-
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-void SM_Communication<T>::increase_ms_timer(){
+void SMCom<T>::increase_ms_timer(){
 	//Warn about this function, since we cannot use threads here, callbacks must return immeadiately
 	++timeout_counter;
 }
+#endif
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-void SM_Communication<T>::run_request_scheduler(){
+void SMCom<T>::run_request_scheduler(){
 	//Check that do we have a timedout request?
 	request_list_iterator prev;
 	while( (prev = get_timedout_request() ) != request_list.end()){
@@ -286,17 +281,19 @@ void SM_Communication<T>::run_request_scheduler(){
 			return;
 		}
 		if(it->fptr != NULL){
-			it->fptr(SM_COMMUNICATION_STATUS_TIMEOUT,&it->packet);
+			it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
 		}
 		else{
-			tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SM_COMMUNICATION_STATUS_TIMEOUT,&it->packet);
+			tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
 		}
 		request_list.erase_after(prev);
 	}	
 }
+#endif
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-typename SM_Communication<T>::request_list_iterator SM_Communication<T>::get_request(T * packet){
+typename SMCom<T>::request_list_iterator SMCom<T>::get_request(T * packet){
 	//We know that structs contain data_len/receiver_id/transmitter_id/message_id/message_type
 	//In all these cases some types don't contain some variables(eg receiver id)
 	//So skipping the data_len leaves the possible matches for requests
@@ -318,9 +315,12 @@ typename SM_Communication<T>::request_list_iterator SM_Communication<T>::get_req
 	}
 	return 	request_list.end();
 }
+#endif
 
+
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-bool SM_Communication<T>::remove_request_from_list(T * packet){
+bool SMCom<T>::remove_request_from_list(T * packet){
 	request_list_iterator it = get_request(packet);
 	if(it == request_list.end())
 		return false;
@@ -329,9 +329,12 @@ bool SM_Communication<T>::remove_request_from_list(T * packet){
 	request_list.erase_after(it);
 	return true;
 }
+#endif
 
+
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-typename SM_Communication<T>::request_list_iterator SM_Communication<T>::get_timedout_request(){
+typename SMCom<T>::request_list_iterator SMCom<T>::get_timedout_request(){
 	//Seek in the requests and return the previous iterator of the first timeout
 	if(!request_list.empty() ){
 		auto it = request_list.before_begin();
@@ -347,17 +350,21 @@ typename SM_Communication<T>::request_list_iterator SM_Communication<T>::get_tim
 	}
 	return 	request_list.end();
 }
+#endif
 
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-bool SM_Communication<T>::is_request_registered_before(){
+bool SMCom<T>::is_request_registered_before(){
 	return get_request(&com_packet) != request_list.end();
 }
+#endif
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::register_request(uint32_t timeout, request_response_callback fptr){
+SMCom_Status_t SMCom<T>::register_request(uint32_t timeout, request_response_callback fptr){
 	if(is_request_registered_before()){
-		return SM_COMMUNICATION_STATUS_FAIL;
+		return SMCOM_STATUS_FAIL;
 	}
 
 	//Do we need to stop timer ? Or just assume the below operation is fast
@@ -368,42 +375,43 @@ SM_Communication_Status_t SM_Communication<T>::register_request(uint32_t timeout
 
 	request_list.push_front(rp);	
 
-	return SM_COMMUNICATION_STATUS_SUCCESS;
+	return SMCOM_STATUS_SUCCESS;
 }
+#endif
 
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_request(const uint8_t * raw_bytes, uint8_t len, uint32_t timeout, request_response_callback fptr){
+SMCom_Status_t SMCom<T>::common_request(const uint8_t * raw_bytes, uint8_t len, uint32_t timeout, request_response_callback fptr){
 
-	if(raw_bytes == NULL && len != 0) return SM_COMMUNICATION_STATUS_FAIL;
+	if(raw_bytes == NULL && len != 0) return SMCOM_STATUS_FAIL;
 
-	com_packet.message_type = SM_Communication_message_types::REQUEST;
+	com_packet.message_type = SMCom_message_types::REQUEST;
 
-	SM_Communication_Status_t ret = register_request(timeout,fptr);
+	SMCom_Status_t ret = register_request(timeout,fptr);
 
-	if(ret == SM_COMMUNICATION_STATUS_SUCCESS){
+	if(ret == SMCOM_STATUS_SUCCESS){
 		ret = common_write(raw_bytes,len);
-		if(ret != SM_COMMUNICATION_STATUS_SUCCESS){
+		if(ret != SMCOM_STATUS_SUCCESS){
 			//Delete request, which is the first item in the list
 			request_list.erase_after(request_list.before_begin());
 		}
 	}
-
 	return ret;
 }
-
+#endif
 
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_start_write_queue(){
+SMCom_Status_t SMCom<T>::common_start_write_queue(){
 
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1. 
 		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
-		return SM_COMMUNICATION_STATUS_PORT_BUSY;
+		return SMCOM_STATUS_PORT_BUSY;
 	}
 
-	SM_Communication_Status_t ret = SM_COMMUNICATION_STATUS_DEFAULT;
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	clear_tx_flag();
 	last_crc = CRC_IBM_SEED;
 
@@ -411,14 +419,14 @@ SM_Communication_Status_t SM_Communication<T>::common_start_write_queue(){
 	uint8_t head = MESSAGE_START;
 	last_crc = get_crc_ibm(&head,1,last_crc);
 	ret = __write__(&head,1);									
-		if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+		if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
 	last_crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),last_crc);
 	ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+		if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
 	txflag.rx_tx_id_flag = 1;
 
@@ -429,23 +437,23 @@ SM_Communication_Status_t SM_Communication<T>::common_start_write_queue(){
 
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_push_to_queue(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t len){
 
-	if(buffer == NULL && len != 0) return SM_COMMUNICATION_STATUS_FAIL;
+	if(buffer == NULL && len != 0) return SMCOM_STATUS_FAIL;
 
-	SM_Communication_Status_t ret = SM_COMMUNICATION_STATUS_DEFAULT;
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	
-	if(txflag.start_byte_flag == 0) return SM_COMMUNICATION_STATUS_START_BYTE_ERROR;
-	if(txflag.rx_tx_id_flag == 0) return SM_COMMUNICATION_STATUS_FAIL;
+	if(txflag.start_byte_flag == 0) return SMCOM_STATUS_START_BYTE_ERROR;
+	if(txflag.rx_tx_id_flag == 0) return SMCOM_STATUS_FAIL;
 
 	com_packet.data_len += len;
 
-	if(com_packet.data_len > MAX_MSG_LENGTH) return SM_COMMUNICATION_STATUS_FAIL;
+	if(com_packet.data_len > MAX_MSG_LENGTH) return SMCOM_STATUS_FAIL;
 
 	//Data sequence
 	last_crc = get_crc_ibm(buffer,len,last_crc);
 	ret = __write__(buffer,len);
-	if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+	if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
 	txflag.data_flag = 1;
 
@@ -453,12 +461,12 @@ SM_Communication_Status_t SM_Communication<T>::common_push_to_queue(const uint8_
 }
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_finalize_queue(){
-	SM_Communication_Status_t ret = SM_COMMUNICATION_STATUS_DEFAULT;
+SMCom_Status_t SMCom<T>::common_finalize_queue(){
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	
-	if(txflag.start_byte_flag == 0) return SM_COMMUNICATION_STATUS_START_BYTE_ERROR;
-	if(txflag.rx_tx_id_flag == 0) return SM_COMMUNICATION_STATUS_FAIL;
-	if(txflag.data_flag == 0 || com_packet.data_len == 0) return SM_COMMUNICATION_STATUS_FAIL;
+	if(txflag.start_byte_flag == 0) return SMCOM_STATUS_START_BYTE_ERROR;
+	if(txflag.rx_tx_id_flag == 0) return SMCOM_STATUS_FAIL;
+	if(txflag.data_flag == 0 || com_packet.data_len == 0) return SMCOM_STATUS_FAIL;
 
 
 	uint8_t last_bytes[3] = {(uint8_t)((last_crc>>8)&0x00FF), (uint8_t)(last_crc & 0x00FF), MESSAGE_END};	
@@ -467,7 +475,7 @@ SM_Communication_Status_t SM_Communication<T>::common_finalize_queue(){
 
 
 	if(tx_event_handler_callback_ptr!=NULL){
-		tx_event_handler_callback_ptr((SM_Communication_event_types)com_packet.message_type,ret, &com_packet);
+		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 	}
 
 	clear_tx_flag();
@@ -477,23 +485,21 @@ SM_Communication_Status_t SM_Communication<T>::common_finalize_queue(){
 
 
 
-
-
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_write(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1. 
 		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
-		return SM_COMMUNICATION_STATUS_PORT_BUSY;
+		return SMCOM_STATUS_PORT_BUSY;
 	}
 
 	if(buffer == NULL && len != 0)
-		return SM_COMMUNICATION_STATUS_FAIL;
+		return SMCOM_STATUS_FAIL;
 
 	clear_tx_flag();
 
-	SM_Communication_Status_t ret = SM_COMMUNICATION_STATUS_DEFAULT;
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 
 	com_packet.data_len = len;
 
@@ -503,21 +509,21 @@ SM_Communication_Status_t SM_Communication<T>::common_write(const uint8_t * buff
 	uint8_t head = MESSAGE_START;
 	crc = get_crc_ibm(&head,1,crc);
 	ret = __write__(&head,1);									
-		if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+		if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
 	crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),crc);
 	ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+		if(ret != SMCOM_STATUS_SUCCESS) return ret;
 	
 	txflag.rx_tx_id_flag = 1;
 
 	//Data sequence
 	crc = get_crc_ibm(buffer,len,crc);
 	ret = __write__(buffer,len);
-	if(ret != SM_COMMUNICATION_STATUS_SUCCESS) return ret;
+	if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
 	txflag.data_flag = 1;
 	
@@ -531,7 +537,7 @@ SM_Communication_Status_t SM_Communication<T>::common_write(const uint8_t * buff
 
 
 	if(tx_event_handler_callback_ptr!=NULL && com_packet.message_type != REQUEST)
-		tx_event_handler_callback_ptr((SM_Communication_event_types)com_packet.message_type,ret, &com_packet);
+		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 
 
 	return ret;
@@ -539,20 +545,20 @@ SM_Communication_Status_t SM_Communication<T>::common_write(const uint8_t * buff
 
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
+SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
 
-	if(raw_bytes == NULL && *len != 0) return SM_COMMUNICATION_STATUS_NULL_MESSAGE;
+	if(raw_bytes == NULL && *len != 0) return SMCOM_STATUS_NULL_MESSAGE;
 
 	clear_rx_flag();
 	rx_iter = 0;
 
 	//Verifikasyon sizeof ile yapılabilir çünkü struct yapıları headerları barındırıyor. Ve start byte da içermeli
 	if(*len != HEADER_SIZE ){
-		return SM_COMMUNICATION_STATUS_HEADER_LENGTH_ERROR;
+		return SMCOM_STATUS_HEADER_LENGTH_ERROR;
 	}
 	
 	if(raw_bytes[0] != MESSAGE_START){
-		return SM_COMMUNICATION_STATUS_START_BYTE_ERROR;
+		return SMCOM_STATUS_START_BYTE_ERROR;
 	}
 	rx_iter = *len;
 	memcpy(rx_buffer,raw_bytes,rx_iter);
@@ -565,34 +571,34 @@ SM_Communication_Status_t SM_Communication<T>::common_verify_message_header(cons
 	com_packet.data_len = *len;
 
 	//maybe this message is not for us, maybe port is busy
-	if(additional_buffer_check() != SM_COMMUNICATION_STATUS_SUCCESS){
+	if(additional_buffer_check() != SMCOM_STATUS_SUCCESS){
 		rxflag.rx_tx_id_flag = 0;
 		rxflag.port_busy_flag = 1;
-		return SM_COMMUNICATION_STATUS_PORT_BUSY;
+		return SMCOM_STATUS_PORT_BUSY;
 	}
 	//Set the flag we are responsible of this message!
 	rxflag.rx_tx_id_flag = 1;
 
-	return SM_COMMUNICATION_STATUS_SUCCESS;
+	return SMCOM_STATUS_SUCCESS;
 }
 
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const uint8_t * raw_bytes, uint16_t len){
+SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, uint16_t len){
 
-	SM_Communication_Status_t ret = SM_COMMUNICATION_STATUS_DEFAULT;
-	if(raw_bytes == NULL && len != 0) return SM_COMMUNICATION_STATUS_NULL_MESSAGE;
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+	if(raw_bytes == NULL && len != 0) return SMCOM_STATUS_NULL_MESSAGE;
 
-	if(rxflag.rx_tx_id_flag == 0) ret = SM_COMMUNICATION_STATUS_PORT_BUSY;
-	if(rxflag.start_byte_flag == 0) ret =  SM_COMMUNICATION_STATUS_START_BYTE_ERROR;
-	if(rx_iter != HEADER_SIZE ) ret = SM_COMMUNICATION_STATUS_HEADER_LENGTH_ERROR;
+	if(rxflag.rx_tx_id_flag == 0) ret = SMCOM_STATUS_PORT_BUSY;
+	if(rxflag.start_byte_flag == 0) ret =  SMCOM_STATUS_START_BYTE_ERROR;
+	if(rx_iter != HEADER_SIZE ) ret = SMCOM_STATUS_HEADER_LENGTH_ERROR;
 
 	//Also include 3 bytes crc(2)+end(1)
 	//The following error checkings should not invoke rx_callback function, they are strongly forbidden to user
-	if(len != (rx_buffer[1]+3) ) ret = SM_COMMUNICATION_STATUS_MESSAGE_LENGTH_ERROR;
-	if(raw_bytes[len-1] != MESSAGE_END) ret = SM_COMMUNICATION_STATUS_END_BYTE_ERROR;
+	if(len != (rx_buffer[1]+3) ) ret = SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
+	if(raw_bytes[len-1] != MESSAGE_END) ret = SMCOM_STATUS_END_BYTE_ERROR;
 
-	if(ret != SM_COMMUNICATION_STATUS_DEFAULT){
+	if(ret != SMCOM_STATUS_DEFAULT){
 		clear_rx_flag();
 		return ret;
 	}
@@ -608,10 +614,10 @@ SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const 
 	//don't include crc + end bytes
 	crc = get_crc_ibm(raw_bytes,len-3,crc);
 	
-	ret = SM_COMMUNICATION_STATUS_SUCCESS;
+	ret = SMCOM_STATUS_SUCCESS;
 
 	//Even though crc check fails, we need to tell user only crc is broken, callback must be invoked to show user msg is received for itself
-	if(crc != crc_from_msg) ret = SM_COMMUNICATION_STATUS_CRC_ERROR;
+	if(crc != crc_from_msg) ret = SMCOM_STATUS_CRC_ERROR;
 	rxflag.crc_flag = 1;
 
 	memcpy(rx_buffer+rx_iter,raw_bytes,len-3);
@@ -619,18 +625,18 @@ SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const 
 
 	//Skip the start byte and cast it to our message packet
 	T * packet = (T *) (rx_buffer+1);
-	SM_Communication_event_types evt = SM_WRITE_EVENT;
+	SMCom_event_types evt = SM_WRITE_EVENT;
 
 	rxflag.data_flag = 1;
 
 	switch(packet->message_type){
-		case SM_Communication_message_types::WRITE:
+		case SMCom_message_types::WRITE:
 			evt = SM_WRITE_EVENT;
 			break;
-		case SM_Communication_message_types::REQUEST:
+		case SMCom_message_types::REQUEST:
 			evt = SM_REQUEST_EVENT;
 			break;
-		case SM_Communication_message_types::RESPONSE:
+		case SMCom_message_types::RESPONSE:
 			evt = SM_RESPONSE_EVENT;
 			break;						
 		default:{
@@ -638,6 +644,7 @@ SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const 
 		}
 	}
 
+	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	if(evt == SM_RESPONSE_EVENT){
 		//Check that is this a response from a registered request before ?
 		request_list_iterator prev = check_incoming_response(packet);
@@ -652,6 +659,7 @@ SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const 
 			request_list.erase_after(prev);
 		}
 	}
+	#endif
 
 	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
 		rx_event_handler_callback_ptr(evt,ret,packet);
@@ -663,24 +671,24 @@ SM_Communication_Status_t SM_Communication<T>::common_handle_message_data(const 
 
 
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t len){
+SMCom_Status_t SMCom<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t len){
 		return common_handle_message_data(raw_bytes,len);
 }
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
+SMCom_Status_t SMCom<T>::verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
 	return common_verify_message_header(raw_bytes,len);
 }
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
 		return common_push_to_queue(buffer,len);
 }
 template<typename T>
-SM_Communication_Status_t SM_Communication<T>::finalize_queue(){
+SMCom_Status_t SMCom<T>::finalize_queue(){
 	return common_finalize_queue();
 }
 
 template<typename CT>
-CT * SM_Communication<CT>::duplicate_message_packet(const CT * packet){
+CT * SMCom<CT>::duplicate_message_packet(const CT * packet){
 	uint16_t sz = sizeof(packet) + packet->data_len;
 	CT * p = (CT *) malloc(sz);
 	memcpy(p,packet,sz);
@@ -688,26 +696,26 @@ CT * SM_Communication<CT>::duplicate_message_packet(const CT * packet){
 }
 
 template<typename T>
-uint8_t SM_Communication<T>::get_packet_data_length(const T * packet){
+uint8_t SMCom<T>::get_packet_data_length(const T * packet){
 	return packet->data_len;
 }
 
 
 template<typename T>
-void SM_Communication<T>::clear_tx_flag(){
+void SMCom<T>::clear_tx_flag(){
 	memset(&txflag,0,sizeof(message_flags));
 	//txflag = {0};
 }
 
 template<typename T>
-void SM_Communication<T>::clear_rx_flag(){
+void SMCom<T>::clear_rx_flag(){
 	memset(&rxflag,0,sizeof(message_flags));
 	//rxflag = {0};
 }
 
 //CRC CODES
 template<typename T>
-uint16_t SM_Communication<T>::compute_crc_ibm(uint16_t crc, uint8_t data){
+uint16_t SMCom<T>::compute_crc_ibm(uint16_t crc, uint8_t data){
 	for (uint8_t i = 0; i < 8; ++i){
 		uint8_t b = ((crc & 0x8000) >> 8);
 		crc <<= 1; // shift left once
@@ -722,7 +730,7 @@ uint16_t SM_Communication<T>::compute_crc_ibm(uint16_t crc, uint8_t data){
 }
 
 template<typename T>
-uint16_t SM_Communication<T>::get_crc_ibm(const uint8_t * buffer, uint8_t len,uint16_t crc){
+uint16_t SMCom<T>::get_crc_ibm(const uint8_t * buffer, uint8_t len,uint16_t crc){
 	
 	for (uint8_t i = 0; i < len; ++i){
 		crc = compute_crc_ibm(crc,buffer[i]);	
@@ -730,5 +738,5 @@ uint16_t SM_Communication<T>::get_crc_ibm(const uint8_t * buffer, uint8_t len,ui
 	return crc;
 }
 
-template class SM_Communication<SM_COMMUNICATION_PUBLIC>;
-template class SM_Communication<SM_COMMUNICATION_PRIVATE>;
+template class SMCom<SMCOM_PUBLIC>;
+template class SMCom<SMCOM_PRIVATE>;
