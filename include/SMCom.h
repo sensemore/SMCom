@@ -177,9 +177,9 @@ public:
 
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
 	
-	SM_Com(uint16_t rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SM_Com(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	~SM_Com();
+	SMCom(uint16_t rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	~SMCom();
 
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
 	SMCom_Status_t handle_message_data(const uint8_t * raw_bytes, uint16_t len);
