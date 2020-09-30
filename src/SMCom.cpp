@@ -149,7 +149,6 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, con
 	com_packet.receiver_id = inc_packet->transmitter_id;	
 	return common_write(buffer,len);
 }
-#endif
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
@@ -160,7 +159,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_
 	
 	return common_write(buffer,len);
 }
-
+#endif
 
 
 template<>
