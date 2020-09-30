@@ -19,8 +19,6 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint16_t _rx_buf_size, rx_event_handler_callback rx,
 	tx_event_handler_callback_ptr = tx;
 }
 
-
-
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len){
 	com_packet.message_type = t;
@@ -36,12 +34,15 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, ui
 	return common_start_write_queue();
 }
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 	com_packet.message_id = message_id;
 	return common_request(buffer,len,timeout,fptr);
 }
+#endif
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
 	com_packet.message_type = SMCom_message_types::RESPONSE;
@@ -55,6 +56,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, c
 	com_packet.message_id = inc_packet->message_id;
 	return common_write(buffer,len);
 }
+#endif
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::additional_buffer_check(){
@@ -128,6 +130,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(SMCom_message_types t, uint8_t receive
 	return common_write(buffer,len);
 }
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 	
@@ -135,8 +138,9 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_
 	com_packet.receiver_id = receiver_id;
 	return common_request(buffer,len,timeout,fptr);
 }
+#endif
 
-
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
 
@@ -145,6 +149,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, con
 	com_packet.receiver_id = inc_packet->transmitter_id;	
 	return common_write(buffer,len);
 }
+#endif
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){

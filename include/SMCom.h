@@ -184,15 +184,16 @@ public:
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
 	SMCom_Status_t handle_message_data(const uint8_t * raw_bytes, uint16_t len);
 
-
 	SMCom_Status_t write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t write(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 
+	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len);
+	#endif
 
 
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
