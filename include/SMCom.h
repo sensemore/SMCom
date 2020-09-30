@@ -6,8 +6,11 @@
 #include <cstdint>
 #include <cstring>
 
+#ifndef SMCOM_CONFIG_REQUEST_RESPONSE
+#define SMCOM_CONFIG_REQUEST_RESPONSE 0
+#endif
 
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+#if SMCOM_CONFIG_REQUEST_RESPONSE
 
 #include <ctime>
 #include <forward_list>
@@ -175,7 +178,9 @@ public:
 	typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
 
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
+	#endif
 	
 	SMCom(uint16_t rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	SMCom(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
@@ -187,7 +192,7 @@ public:
 	SMCom_Status_t write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t write(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
@@ -217,7 +222,7 @@ public:
 	}
 
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	void increase_ms_timer();
 	void run_request_scheduler();
 	#endif
@@ -253,7 +258,7 @@ private:
 
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t common_request(const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr);
 	#endif
 	
@@ -268,7 +273,7 @@ private:
 	SMCom_Status_t common_finalize_queue();
 
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	//@TODO
 	//Maybe we can add another request packet without fptr????
 	typedef struct request_packet{
