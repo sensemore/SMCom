@@ -11,17 +11,21 @@
 // +----------+-----------+-------+----------+----+---------+
 
 template<>
-SMCom<SMCOM_PRIVATE>::SMCom(uint16_t _rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
+SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
 	//rx_buffer = (uint8_t*)malloc(_rx_buf_size);
-	rx_buffer = new uint8_t[_rx_buf_size];
-	rx_buf_size = _rx_buf_size;
+	rx_buffer = new uint8_t[rx_buf_size];
+	tx_buffer = (tx_buf_size > 0) new uint8_t[tx_buf_size] : NULL;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 }
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len){
-	com_packet.message_type = t;
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	return common_write(buffer,len);
 }
@@ -105,13 +109,18 @@ SMCom<SMCOM_PRIVATE>::~SMCom(){
 
 
 template<>
-SMCom<SMCOM_PUBLIC>::SMCom(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
-	rx_buffer = new uint8_t[_rx_buf_size];
-	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
-	com_packet.transmitter_id = id;
-	rx_buf_size = _rx_buf_size;
+SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
+	rx_buffer = new uint8_t[rx_buf_size];
+	tx_buffer = (tx_buf_size > 0) new uint8_t[tx_buf_size] : NULL;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
+
+	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
+	com_packet.transmitter_id = id;
 }
 
 template<>
@@ -121,9 +130,9 @@ void SMCom<SMCOM_PUBLIC>::assign_new_id(uint8_t id){
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
 
-	com_packet.message_type = t;
+	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
 	
@@ -488,26 +497,76 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 }
 
 
-
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
-
-	if(rxflag.port_busy_flag){
-		//If header is verified and port is busy, this flag is set to 1. 
-		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
-		return SMCOM_STATUS_PORT_BUSY;
-	}
-
-	if(buffer == NULL && len != 0)
-		return SMCOM_STATUS_FAIL;
-
-	clear_tx_flag();
+SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len){
+	//before calling this function check that txbuffer is not null
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+	uint16_t crc = CRC_IBM_SEED;
+	com_packet.data_len = len;
+	
+	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4 
+	uint16_t possible_packet_size = sizeof(T) + 4 + len;
 
+	if(packet_size > 0 && packet_size >= possible_packet_size){
+		//Tell receiver that this packet has padding bytes
+		com_packet.data_len += (packet_size - possible_packet_size);
+	}
+	else{
+		//If user fixes the packet size and try to exceed we won't publish the message
+		return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
+	}
+	
+
+	uint16_t txit = 0;
+	//Start sequence
+	tx_buffer[txit++] = MESSAGE_START;
+	txflag.start_byte_flag = 1;
+
+	memcpy(tx_buffer+txit,(uint8_t *)&com_packet,sizeof(com_packet));
+	txit += sizeof(com_packet);
+	txflag.rx_tx_id_flag = 1;
+
+	memcpy(tx_buffer+txit,(uint8_t *)buffer,len);
+	txit += len;
+	txflag.data_flag = 1;
+
+	if(packet_size > possible_packet_size){
+		uint16_t padding = packet_size-possible_packet_size;
+		memset(tx_buffer+txit, 0x0, padding);
+		txit += padding;
+	}
+	
+	crc = get_crc_ibm(tx_buffer,txit,crc);
+	//CRC sequence
+	//In reverse order
+	tx_buffer[txit++] = (uint8_t)((crc>>8)&0x00FF);
+	tx_buffer[txit++] = (uint8_t)(crc & 0x00FF);
+	tx_buffer[txit++] = MESSAGE_END;
+
+	txflag.crc_flag = 1;
+
+	return __write__(tx_buffer,txit);
+}
+
+
+template<typename T>
+SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t len){
+
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
 
-	uint16_t crc = CRC_IBM_SEED;
+	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4 
+	uint16_t possible_packet_size = sizeof(T) + 4 + len;
+	if(packet_size > 0 && packet_size >= possible_packet_size){
+		//Tell receiver that this packet has padding bytes
+		com_packet.data_len += (packet_size - possible_packet_size);
+	}
+	else{
+		//If user fixes the packet size and try to exceed we won't publish the message
+		return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
+	}
 	
 	//Start sequence
 	uint8_t head = MESSAGE_START;
@@ -529,23 +588,55 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 	ret = __write__(buffer,len);
 	if(ret != SMCOM_STATUS_SUCCESS) return ret;
 
+	if(packet_size > possible_packet_size){
+		//Now add padding, user wants to fix message size
+		uint16_t padding = (packet_size - possible_packet_size);
+		while(padding--){
+			uint8_t d = 0;
+			ret = __write__(&d,1);
+			if(ret != SMCOM_STATUS_SUCCESS) return ret;
+		}
+	}
 	txflag.data_flag = 1;
-	
 	//CRC sequence
 	//In reverse order
 	uint8_t last_bytes[3] = {(uint8_t)((crc>>8)&0x00FF), (uint8_t)(crc & 0x00FF), MESSAGE_END};
 
 	txflag.crc_flag = 1;
+	return __write__(last_bytes,3);
+}
 
-	ret = __write__(last_bytes,3);
 
+template<typename T>
+SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
+	if(rxflag.port_busy_flag){
+		//If header is verified and port is busy, this flag is set to 1. 
+		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
+		return SMCOM_STATUS_PORT_BUSY;
+	}
 
-	if(tx_event_handler_callback_ptr!=NULL && com_packet.message_type != REQUEST)
+	if(buffer == NULL && len != 0)
+		return SMCOM_STATUS_FAIL;
+
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+
+	clear_tx_flag();
+	
+
+	if(tx_buffer && tx_buf_size){
+		ret = common_write_txbuffer(buffer,len);
+	}
+	else{
+		ret = common_write_polling(buffer,len);	
+	}
+
+	//if it is a request we won't call general tx handler because each request has its own callback function
+	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
-
 
 	return ret;
 }
+
 
 
 template<typename T>
@@ -629,24 +720,9 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 
 	//Skip the start byte and cast it to our message packet
 	T * packet = (T *) (rx_buffer+1);
-	SMCom_event_types evt = SM_WRITE_EVENT;
+	SMCom_event_types evt = (SMCom_event_types) packet->message_type;
 
 	rxflag.data_flag = 1;
-
-	switch(packet->message_type){
-		case SMCom_message_types::WRITE:
-			evt = SM_WRITE_EVENT;
-			break;
-		case SMCom_message_types::REQUEST:
-			evt = SM_REQUEST_EVENT;
-			break;
-		case SMCom_message_types::RESPONSE:
-			evt = SM_RESPONSE_EVENT;
-			break;						
-		default:{
-			break;
-		}
-	}
 
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	if(evt == SM_RESPONSE_EVENT){
@@ -689,6 +765,12 @@ SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
 template<typename T>
 SMCom_Status_t SMCom<T>::finalize_queue(){
 	return common_finalize_queue();
+}
+
+
+template<typename T>
+void SMCom<T>::set_fixed_packet_size(uint8_t packet_size){
+	this->packet_size = packet_size;
 }
 
 template<typename CT>

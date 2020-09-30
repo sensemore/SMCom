@@ -61,6 +61,7 @@
 
 
 //like uart, rx-tx are connected to only two devices. Buffer does not contain receiver id or transmitter id
+// adds 6-bytes to message packet including start byte, end byte crc etc.
 struct smcom_private_t{
 	uint8_t data_len;
 	uint8_t message_type:2;
@@ -71,6 +72,7 @@ typedef struct smcom_private_t SMCOM_PRIVATE;
 
 
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 4bits which can only support 15 devices, 0 for public
+// adds 7-bytes to message packet including start byte, end byte crc etc.
 struct smcom_public_4bit_adr{
 	uint8_t data_len;
 	uint8_t receiver_id:4;
@@ -81,7 +83,9 @@ struct smcom_public_4bit_adr{
 }__attribute__((packed));
 typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
 
+
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 8bits, which can only support 255 devices, 255 for public, 254 is default id
+// adds 8-bytes to message packet including start byte, end byte crc etc.
 struct smcom_public_8bit_adr{
 	uint8_t data_len;
 	uint8_t receiver_id;
@@ -94,10 +98,11 @@ typedef struct smcom_public_8bit_adr SMCOM_PUBLIC_8BIT_ADDRESS;
 
 #ifdef SMCOM_CONFIG_CUSTOM_ADDRESS
 //user can define any address byte
+// adds 6-bytes + 2*custom_address_size to message packet including start byte, end byte crc etc.
 struct smcom_public_custom_adr{
 	uint8_t data_len;
 	uint8_t receiver_id[SMCOM_CUSTOM_ADDRESS];
-	uint8_t transmitter_id;
+	uint8_t transmitter_id[SMCOM_CUSTOM_ADDRESS];
 	uint8_t message_type:2;
 	uint8_t message_id:6;
 	uint8_t data[0];
@@ -182,15 +187,15 @@ public:
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
 	#endif
 	
-	SMCom(uint16_t rx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SMCom(uint16_t _rx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	~SMCom();
 
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
 	SMCom_Status_t handle_message_data(const uint8_t * raw_bytes, uint16_t len);
 
-	SMCom_Status_t write(SMCom_message_types t, uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t write(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
@@ -203,13 +208,14 @@ public:
 
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len);
-
 	SMCom_Status_t push_to_queue(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t finalize_queue();
 
-	uint8_t get_packet_data_length(const CT * packet);
-	
+	//If given message length is smaller than packet size, we add padding bytes to fullfill the condition of packet size
+	void set_fixed_packet_size(uint16_t packet_size);
 
+
+	uint8_t get_packet_data_length(const CT * packet);
 	CT * duplicate_message_packet(const CT * packet);
 
 	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint8_t len) = 0;
@@ -252,11 +258,14 @@ public:
 
 	static const uint8_t HEADER_SIZE = sizeof(CT)+1;
 	static const uint8_t MAX_MSG_LENGTH = 0xFF;
+	uint8_t packet_size = 0;
 
 private:
 
 
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len);
 
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t common_request(const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr);
@@ -302,10 +311,14 @@ private:
 	uint8_t * rx_buffer = NULL;
 	uint16_t rx_iter = 0;
 	uint16_t rx_buf_size = 0;
+	
+	uint8_t * tx_buffer = NULL;
+	uint16_t tx_buf_size = 0;
 
 	uint16_t message_end_index;
 
-	message_flags rxflag, txflag;
+	message_flags rxflag;
+	message_flags txflag;
 
 	uint16_t last_crc;
 
