@@ -94,6 +94,7 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
 	delete[] rx_buffer;
+	delete[] tx_buffer;
 }
 
 //===================================================================================================================================================================================
@@ -222,6 +223,7 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
 	delete[] rx_buffer;
+	delete[] tx_buffer;
 }
 
 
@@ -508,14 +510,17 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4 
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
 
-	if(packet_size > 0 && packet_size >= possible_packet_size){
-		//Tell receiver that this packet has padding bytes
-		com_packet.data_len += (packet_size - possible_packet_size);
+	if(packet_size > 0){
+		if(packet_size >= possible_packet_size){
+			//Tell receiver that this packet has padding bytes
+			com_packet.data_len += (packet_size - possible_packet_size);
+		}
+		else{
+			//If user fixes the packet size and try to exceed we won't publish the message
+			return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
+		}	
 	}
-	else{
-		//If user fixes the packet size and try to exceed we won't publish the message
-		return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
-	}
+	
 	
 
 	uint16_t txit = 0;
@@ -559,14 +564,17 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4 
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
-	if(packet_size > 0 && packet_size >= possible_packet_size){
-		//Tell receiver that this packet has padding bytes
-		com_packet.data_len += (packet_size - possible_packet_size);
+	if(packet_size > 0){
+		if(packet_size >= possible_packet_size){
+			//Tell receiver that this packet has padding bytes
+			com_packet.data_len += (packet_size - possible_packet_size);
+		}
+		else{
+			//If user fixes the packet size and try to exceed we won't publish the message
+			return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
+		}
 	}
-	else{
-		//If user fixes the packet size and try to exceed we won't publish the message
-		return SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
-	}
+	
 	
 	//Start sequence
 	uint8_t head = MESSAGE_START;
