@@ -108,7 +108,7 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
-	if(static_buffer_provided){
+	if(!static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;	
 	}
@@ -256,7 +256,7 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
-	if(static_buffer_provided){
+	if(!static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;	
 	}
