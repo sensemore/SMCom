@@ -187,8 +187,11 @@ public:
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
 	#endif
 	
+	//Dynamic constructors uses new
 	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	~SMCom();
 
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
@@ -219,6 +222,10 @@ public:
 	CT * duplicate_message_packet(const CT * packet);
 
 	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint8_t len) = 0;
+	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
+	virtual size_t __available__();
+	//In order to call listener user must provide __read__ and __available__ functions
+	SMCom_Status_t listener(void);
 
 	bool is_packet_broken(SMCom_Status_t stat){
 		return stat >= SMCOM_STATUS_FAIL;
@@ -261,7 +268,6 @@ public:
 
 private:
 
-
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len);
@@ -273,8 +279,8 @@ private:
 	SMCom_Status_t common_read_internal(const uint8_t * raw_bytes, uint8_t len,uint8_t end_byte_start_offset);
 	SMCom_Status_t additional_buffer_check();
 	
-	SMCom_Status_t common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
-	SMCom_Status_t common_handle_message_data(const uint8_t * raw_bytes, uint16_t len);
+	SMCom_Status_t common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer);
+	SMCom_Status_t common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer);
 
 	SMCom_Status_t common_start_write_queue();
 	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len);	
@@ -304,7 +310,6 @@ private:
 	void clear_tx_flag();
 	void clear_rx_flag();
 
-
 	CT com_packet;
 
 	uint8_t * rx_buffer = NULL;
@@ -313,6 +318,8 @@ private:
 	
 	uint8_t * tx_buffer = NULL;
 	uint16_t tx_buf_size = 0;
+
+	uint8_t static_buffer_provided = 0;
 
 	uint16_t message_end_index;
 

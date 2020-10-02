@@ -11,7 +11,7 @@
 // +----------+-----------+-------+----------+----+---------+
 
 template<>
-SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx ){
+SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	//rx_buffer = (uint8_t*)malloc(_rx_buf_size);
 	rx_buffer = new uint8_t[rx_buf_size];
 	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
@@ -22,6 +22,21 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 }
+
+template<>
+SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
+	this->rx_buffer = rx_buffer;
+	this->tx_buffer = tx_buffer;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
+
+	user_static_buffer_provided = 1;
+}
+
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * buffer, uint8_t len){
@@ -93,8 +108,10 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
-	delete[] rx_buffer;
-	delete[] tx_buffer;
+	if(user_static_buffer_provided){
+		delete[] rx_buffer;
+		delete[] tx_buffer;	
+	}
 }
 
 //===================================================================================================================================================================================
@@ -122,6 +139,23 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
+}
+
+template<>
+SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
+	this->rx_buffer = rx_buffer;
+	this->tx_buffer = tx_buffer;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
+
+	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
+	com_packet.transmitter_id = id;
+
+	user_static_buffer_provided = 1;
 }
 
 template<>
@@ -222,8 +256,10 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
-	delete[] rx_buffer;
-	delete[] tx_buffer;
+	if(user_static_buffer_provided){
+		delete[] rx_buffer;
+		delete[] tx_buffer;	
+	}
 }
 
 
@@ -648,7 +684,7 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
+SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
 
 	if(raw_bytes == NULL && *len != 0) return SMCOM_STATUS_NULL_MESSAGE;
 
@@ -664,7 +700,11 @@ SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes,
 		return SMCOM_STATUS_START_BYTE_ERROR;
 	}
 	rx_iter = *len;
-	memcpy(rx_buffer,raw_bytes,rx_iter);
+
+	if(copy_buffer){
+		//If we call this we will provide rx_buffer already copied the data so no need to copy it again
+		memcpy(rx_buffer,raw_bytes,rx_iter);
+	}
 
 	rxflag.start_byte_flag = 1;
 
@@ -687,7 +727,7 @@ SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes,
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, uint16_t len){
+SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer){
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	if(raw_bytes == NULL && len != 0) return SMCOM_STATUS_NULL_MESSAGE;
@@ -723,7 +763,10 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	if(crc != crc_from_msg) ret = SMCOM_STATUS_CRC_ERROR;
 	rxflag.crc_flag = 1;
 
-	memcpy(rx_buffer+rx_iter,raw_bytes,len-3);
+	if(copy_buffer){
+		memcpy(rx_buffer+rx_iter,raw_bytes,len-3);	
+	}
+	
 	rx_iter += (len-3);
 
 	//Skip the start byte and cast it to our message packet
@@ -757,6 +800,37 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	return ret;
 }
 
+template<typename T>
+SMCom_Status_t SMCom<T>::__read__(uint8_t * buffer, uint16_t len){
+	return SMCOM_STATUS_FAIL;
+}
+
+template<typename T>
+size_t SMCom<T>::__available__(){
+	return 0;
+}
+
+template<typename T>
+SMCom_Status_t SMCom<T>::listener(void){
+	uint16_t len = HEADER_SIZE;
+	size_t avlb = __available__();
+
+	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
+
+	if(avlb>=HEADER_SIZE){
+		uint8_t * ptr = rx_buffer;
+		if(__read__(ptr,HEADER_SIZE) == SMCOM_STATUS_SUCCESS){
+			status = obj->common_verify_message_header(ptr, &len,false);
+			if(is_packet_broken(status)) return status;
+		}
+		ptr += HEADER_SIZE;
+		if(__read__(ptr,len) == SM_UART_STATUS_SUCCESS){
+			status = obj->common_handle_message_data(buf,len,false);
+		}
+	}
+	return status;
+}
+
 
 template<typename T>
 SMCom_Status_t SMCom<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t len){
@@ -764,11 +838,11 @@ SMCom_Status_t SMCom<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
-	return common_verify_message_header(raw_bytes,len);
+	return common_verify_message_header(raw_bytes,len,true);
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
-		return common_push_to_queue(buffer,len);
+		return common_push_to_queue(buffer,len,true);
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::finalize_queue(){
