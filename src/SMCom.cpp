@@ -827,7 +827,7 @@ SMCom_Status_t SMCom<T>::listener(void){
 		ptr += HEADER_SIZE;
 		status = __read__(ptr,len);
 		if(status == SMCOM_STATUS_SUCCESS){
-			status = common_handle_message_data(buf,len,false);
+			status = common_handle_message_data(ptr,len,false);
 		}
 	}
 	return status;
@@ -844,7 +844,7 @@ SMCom_Status_t SMCom<T>::verify_message_header(const uint8_t * raw_bytes, uint16
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
-		return common_push_to_queue(buffer,len,true);
+		return common_push_to_queue(buffer,len);
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::finalize_queue(){
