@@ -34,7 +34,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 
-	user_static_buffer_provided = 1;
+	static_buffer_provided = 1;
 }
 
 
@@ -108,7 +108,7 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
-	if(user_static_buffer_provided){
+	if(static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;	
 	}
@@ -155,7 +155,7 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
 
-	user_static_buffer_provided = 1;
+	static_buffer_provided = 1;
 }
 
 template<>
@@ -256,7 +256,7 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
-	if(user_static_buffer_provided){
+	if(static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;	
 	}
@@ -819,13 +819,15 @@ SMCom_Status_t SMCom<T>::listener(void){
 
 	if(avlb>=HEADER_SIZE){
 		uint8_t * ptr = rx_buffer;
-		if(__read__(ptr,HEADER_SIZE) == SMCOM_STATUS_SUCCESS){
-			status = obj->common_verify_message_header(ptr, &len,false);
+		status = __read__(ptr,HEADER_SIZE);
+		if(status == SMCOM_STATUS_SUCCESS){
+			status = common_verify_message_header(ptr, &len,false);
 			if(is_packet_broken(status)) return status;
 		}
 		ptr += HEADER_SIZE;
-		if(__read__(ptr,len) == SM_UART_STATUS_SUCCESS){
-			status = obj->common_handle_message_data(buf,len,false);
+		status = __read__(ptr,len);
+		if(status == SMCOM_STATUS_SUCCESS){
+			status = common_handle_message_data(buf,len,false);
 		}
 	}
 	return status;
@@ -834,7 +836,7 @@ SMCom_Status_t SMCom<T>::listener(void){
 
 template<typename T>
 SMCom_Status_t SMCom<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t len){
-		return common_handle_message_data(raw_bytes,len);
+		return common_handle_message_data(raw_bytes,len,true);
 }
 template<typename T>
 SMCom_Status_t SMCom<T>::verify_message_header(const uint8_t * raw_bytes, uint16_t * len){
