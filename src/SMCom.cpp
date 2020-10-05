@@ -61,7 +61,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::request(uint8_t message_id, const uint8_t *
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
 	com_packet.message_type = SMCom_message_types::RESPONSE;
@@ -75,7 +75,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, c
 	com_packet.message_id = inc_packet->message_id;
 	return common_write(buffer,len);
 }
-#endif
+
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::additional_buffer_check(){
@@ -184,7 +184,6 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
 
@@ -203,7 +202,6 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_
 	
 	return common_write(buffer,len);
 }
-#endif
 
 
 template<>

@@ -1,5 +1,5 @@
-#ifndef _SMCOM_H
-#define _SMCOM_H
+#ifndef SMCOM_H
+#define SMCOM_H
 
 #include <cstdio>
 #include <cstdlib>
@@ -20,15 +20,6 @@
 
 /*
 	Some configurations macros before including this class
-	-SMCOM BUFFER MEMORY
-		SMCOM_CONFIG_STATIC_MEMORY : smcom statically defines its memory, does not use "new"
-			expects SMCOM_CONFIG_STATIC_RX_SIZE and SMCOM_CONFIG_STATIC_TX_SIZE as macros
-			default values are 1024 and 0
-
-		SMCOM_CONFIG_DYNAMIC_MEMORY : smcom dynamically defines its memory, uses "new"
-		default : SMCOM_CONFIG_STATIC_MEMORY
-		Most of the time communication will be used and we do not need to define memory dynamically
-	
 	-SMCOM REQUEST-RESPONSE FLAG
 		SMCOM_CONFIG_REQUEST_RESPONSE
 		SMCom holds requests inside a linkedlist.
@@ -41,12 +32,6 @@
 
 */
 
-
-#define SMCOM_CONFIG_STATIC_MEMORY
-
-#ifndef SMCOM_RX_BUFFER_SIZE
-#define SMCOM_RX_BUFFER_SIZE 1024
-#endif
 
 // static uint8_t __rx_buffer[SMCOM_RX_BUFFER_SIZE];
 
@@ -203,10 +188,11 @@ public:
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
+	#endif
 	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len);
-	#endif
+	
 
 
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
