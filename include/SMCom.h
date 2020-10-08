@@ -20,11 +20,11 @@
 //  SMCOM_VERSION % 100 : patch level
 //  SMCOM_VERSION / 100 % 1000 : minor version
 //  SMCOM_VERSION / 100000 : major version
-#define __SMCOM_PATCH_LEVEL__ 	0
-#define __SMCOM_MINOR_VERSION__ 1
-#define __SMCOM_MAJOR_VERSION__ 0
+#define SMCOM_PATCH_LEVEL__ 	0
+#define SMCOM_MINOR_VERSION__ 1
+#define SMCOM_MAJOR_VERSION__ 0
 #define SMCOM_VERSION_STRING	"0.1.0"
-#define SMCOM_VERSION (__SMCOM_MAJOR_VERSION__ * 100000) + (__SMCOM_MINOR_VERSION__ * 100) +__SMCOM_PATCH_LEVEL__
+#define SMCOM_VERSION (SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__
 
 /*
 	Some configurations macros before including this class
@@ -38,9 +38,6 @@
 		default: is undefined macro
 */
 
-
-// static uint8_t __rx_buffer[SMCOM_RX_BUFFER_SIZE];
-
 //General Message type
 // +---------+-----------+---------------+------------+----------+----+---------+
 // |         |           |               |            |          |    |         |
@@ -51,13 +48,13 @@
 // +---------+-----------+---------------+------------+----------+----+---------+
 
 /*
-Bit field ordering is first HIGH then LOW part
+Bit field ordering is the following : first LOW then HIGH part ie little endian
 For example
 struct some_struct{
-	uint8_t a:2;	0bxx000000
-	uint8_t b:2;	0b00xx0000
-	uint8_t c:3;	0b0000xxx0
-	uint8_t d:3;	0b0000000x
+	uint8_t a:2;	0b000000xx
+	uint8_t b:2;	0b0000xx00
+	uint8_t c:3;	0b0xxx0000
+	uint8_t d:3;	0bx0000000
 }__attribute__((packed));
 
 */
@@ -68,7 +65,7 @@ struct smcom_private_t{
 	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63
-	uint8_t data[0];
+	uint8_t data[0];			//<! Data pointer for derived classes
 }__attribute__((packed));
 typedef struct smcom_private_t SMCOM_PRIVATE;
 
@@ -81,7 +78,7 @@ struct smcom_public_4bit_adr{
 	uint8_t transmitter_id:4;	//<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[0];
+	uint8_t data[0];			//<! Data pointer for derived classes
 }__attribute__((packed));
 typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
 
@@ -94,7 +91,7 @@ struct smcom_public_8bit_adr{
 	uint8_t transmitter_id;		//<! Transmitter id in the communication can take value between 0-253 (254 and 255 is reserved)
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[0];
+	uint8_t data[0];			//<! Data pointer for derived classes
 }__attribute__((packed));
 typedef struct smcom_public_8bit_adr SMCOM_PUBLIC_8BIT_ADDRESS;
 
@@ -153,9 +150,9 @@ typedef struct message_flags{
 
 enum SMCom_event_types : uint8_t{
 	SM_WRITE_EVENT = 0,
-	SM_REQUEST_EVENT,
-	SM_RESPONSE_EVENT,
-	SM_INDICATE_EVENT
+	SM_REQUEST_EVENT = 1,
+	SM_RESPONSE_EVENT = 2,
+	SM_INDICATE_EVENT = 3,
 };
 
 enum SMCom_message_types : uint8_t{
@@ -221,9 +218,10 @@ public:
 	SMCom_Status_t push_to_queue(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t finalize_queue();
 
-	//If given message length is smaller than packet size, we add padding bytes to fullfill the condition of packet size
+	//If given message length is smaller than the packet size, we add padding bytes to fullfill the condition of packet size
+	//If it is greater than the packet size we return an error
 	void set_fixed_packet_size(uint16_t packet_size);
-
+	uint64_t get_version();
 
 	uint8_t get_packet_data_length(const CT * packet);
 	CT * duplicate_message_packet(const CT * packet);
@@ -337,8 +335,10 @@ private:
 
 	uint16_t last_crc;
 
+	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	//Timeout counter counts miliseconds
 	uint32_t timeout_counter = 0;
+	#endif
 
 	//Polynomial x^16 + x^12 + x^5 + 1
 	#define POLY_CCITT 0x1021 //'0b1000000100001'
