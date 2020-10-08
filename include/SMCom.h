@@ -11,12 +11,20 @@
 #endif
 
 #if SMCOM_CONFIG_REQUEST_RESPONSE
-
 #include <ctime>
 #include <forward_list>
 #include <iterator>
-
 #endif
+
+
+//  SMCOM_VERSION % 100 : patch level
+//  SMCOM_VERSION / 100 % 1000 : minor version
+//  SMCOM_VERSION / 100000 : major version
+#define __SMCOM_PATCH_LEVEL__ 	0
+#define __SMCOM_MINOR_VERSION__ 1
+#define __SMCOM_MAJOR_VERSION__ 0
+#define SMCOM_VERSION_STRING	"0.1.0"
+#define SMCOM_VERSION (__SMCOM_MAJOR_VERSION__ * 100000) + (__SMCOM_MINOR_VERSION__ * 100) +__SMCOM_PATCH_LEVEL__
 
 /*
 	Some configurations macros before including this class
@@ -28,8 +36,6 @@
 		If macro is not defined no need to include above libraries, SMCom can only be used to write messages
 
 		default: is undefined macro
-
-
 */
 
 
@@ -44,13 +50,24 @@
 // |    1    |     1     |    1,2,4      |      1     |          | 2  |    1    |
 // +---------+-----------+---------------+------------+----------+----+---------+
 
+/*
+Bit field ordering is first HIGH then LOW part
+For example
+struct some_struct{
+	uint8_t a:2;	0bxx000000
+	uint8_t b:2;	0b00xx0000
+	uint8_t c:3;	0b0000xxx0
+	uint8_t d:3;	0b0000000x
+}__attribute__((packed));
+
+*/
 
 //like uart, rx-tx are connected to only two devices. Buffer does not contain receiver id or transmitter id
 // adds 6-bytes to message packet including start byte, end byte crc etc.
 struct smcom_private_t{
-	uint8_t data_len;
-	uint8_t message_type:2;
-	uint8_t message_id:6;
+	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
+	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3
+	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63
 	uint8_t data[0];
 }__attribute__((packed));
 typedef struct smcom_private_t SMCOM_PRIVATE;
@@ -59,11 +76,11 @@ typedef struct smcom_private_t SMCOM_PRIVATE;
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 4bits which can only support 15 devices, 0 for public
 // adds 7-bytes to message packet including start byte, end byte crc etc.
 struct smcom_public_4bit_adr{
-	uint8_t data_len;
-	uint8_t receiver_id:4;
-	uint8_t transmitter_id:4;
-	uint8_t message_type:2;
-	uint8_t message_id:6;
+	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
+	uint8_t receiver_id:4;		//<! Receiver id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0b0000xxxx
+	uint8_t transmitter_id:4;	//<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
+	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
+	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
 	uint8_t data[0];
 }__attribute__((packed));
 typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
@@ -72,11 +89,11 @@ typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 8bits, which can only support 255 devices, 255 for public, 254 is default id
 // adds 8-bytes to message packet including start byte, end byte crc etc.
 struct smcom_public_8bit_adr{
-	uint8_t data_len;
-	uint8_t receiver_id;
-	uint8_t transmitter_id;
-	uint8_t message_type:2;
-	uint8_t message_id:6;
+	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
+	uint8_t receiver_id;		//<! Receiver id in the communication can take value between 0-253 (254 and 255 is reserved)
+	uint8_t transmitter_id;		//<! Transmitter id in the communication can take value between 0-253 (254 and 255 is reserved)
+	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
+	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
 	uint8_t data[0];
 }__attribute__((packed));
 typedef struct smcom_public_8bit_adr SMCOM_PUBLIC_8BIT_ADDRESS;
@@ -95,15 +112,16 @@ struct smcom_public_custom_adr{
 typedef struct smcom_public_custom_adr SMCOM_PUBLIC_CUSTOM_ADDRESS;
 #endif
 
+//Not implemented yet!
 //similar to spi, slave cannot send a message. Only master may request a data
-struct smcom_only_master{
-	uint8_t data_len;
-	uint8_t receiver_id;
-	uint8_t message_type:2;
-	uint8_t message_id:6;
-	uint8_t data[0];
-}__attribute__((packed));
-typedef struct smcom_only_master SMCOM_ONLY_MASTER;
+// struct smcom_only_master{
+// 	uint8_t data_len;
+// 	uint8_t receiver_id;		
+// 	uint8_t message_type:2;
+// 	uint8_t message_id:6;
+// 	uint8_t data[0];
+// }__attribute__((packed));
+// typedef struct smcom_only_master SMCOM_ONLY_MASTER;
 
 
 //broken packet errors must be bigger than SMCOM_STATUS_FAIL, before just notification to user
@@ -172,9 +190,10 @@ public:
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
 	#endif
 	
-	//Dynamic constructors uses new
+	////Constructors with dynamic buffers, uses C++ new allocater
 	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	//Constructors with static buffers
 	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	~SMCom();
@@ -184,6 +203,8 @@ public:
 
 	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
+
+	SMCom_Status_t write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len);
 
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);

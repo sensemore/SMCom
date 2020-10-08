@@ -12,7 +12,7 @@
 
 template<>
 SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
-	//rx_buffer = (uint8_t*)malloc(_rx_buf_size);
+	
 	rx_buffer = new uint8_t[rx_buf_size];
 	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
 
@@ -124,8 +124,6 @@ SMCom<SMCOM_PRIVATE>::~SMCom(){
 // |    1     |     1     |  4bit  |   4bit    |   1   |          | 2  |    1    |
 // +----------+-----------+--------+-----------+-------+----------+----+---------+
 
-
-
 template<>
 SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	rx_buffer = new uint8_t[rx_buf_size];
@@ -173,6 +171,14 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id
 	
 	return common_write(buffer,len);
 }
+
+
+
+template<>
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+	return write(PUBLIC_ID_4BIT,message_id, buffer, len);
+}
+
 
 #if SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
@@ -887,11 +893,9 @@ uint16_t SMCom<T>::compute_crc_ibm(uint16_t crc, uint8_t data){
 	for (uint8_t i = 0; i < 8; ++i){
 		uint8_t b = ((crc & 0x8000) >> 8);
 		crc <<= 1; // shift left once
-
 		if( (b^(data & 0x80)) != 0){	
 			crc ^= POLY_IBM; //xor with polynomial
 		}
-
 		data<<=1; // shift data to get next bit
 	}
 	return crc;
