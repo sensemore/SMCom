@@ -168,7 +168,6 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id
 	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
-
 	return common_write(buffer,len);
 }
 

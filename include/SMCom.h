@@ -226,7 +226,7 @@ public:
 	uint8_t get_packet_data_length(const CT * packet);
 	CT * duplicate_message_packet(const CT * packet);
 
-	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint8_t len) = 0;
+	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) = 0;
 	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 	virtual size_t __available__();
 	//In order to call listener user must provide __read__ and __available__ functions
