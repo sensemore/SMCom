@@ -53,7 +53,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, ui
 	return common_start_write_queue();
 }
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 	com_packet.message_id = message_id;
@@ -83,7 +83,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::additional_buffer_check(){
 	return SMCOM_STATUS_SUCCESS;
 }
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
 typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check_incoming_response(SMCOM_PRIVATE * inc_packet){
 	//packet is (response) from another device, we'll check did we have a request for this response
@@ -179,7 +179,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::write_public(uint8_t message_id, const uint8
 }
 
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
 
@@ -234,7 +234,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::additional_buffer_check(){
 
 }
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<>
 typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_incoming_response(SMCOM_PUBLIC * inc_packet){
 	//packet is (response) from another device, we'll check did we have a request for this response
@@ -314,7 +314,7 @@ SMCom<SMCOM_ONLY_MASTER>::~SMCom(){
 
 
 //COMMON
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::increase_ms_timer(){
 	//Warn about this function, since we cannot use threads here, callbacks must return immeadiately
@@ -324,7 +324,7 @@ void SMCom<T>::increase_ms_timer(){
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::run_request_scheduler(){
 	if(request_scheduler_enabled){
@@ -349,14 +349,14 @@ void SMCom<T>::run_request_scheduler(){
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::enable_request_scheduler(){
 	request_scheduler_enabled = 1;
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 typename SMCom<T>::request_list_iterator SMCom<T>::get_request(T * packet){
 	//We know that structs contain data_len/receiver_id/transmitter_id/message_id/message_type
@@ -383,7 +383,7 @@ typename SMCom<T>::request_list_iterator SMCom<T>::get_request(T * packet){
 #endif
 
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 bool SMCom<T>::remove_request_from_list(T * packet){
 	request_list_iterator it = get_request(packet);
@@ -397,7 +397,7 @@ bool SMCom<T>::remove_request_from_list(T * packet){
 #endif
 
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 typename SMCom<T>::request_list_iterator SMCom<T>::get_timedout_request(){
 	//Seek in the requests and return the previous iterator of the first timeout
@@ -418,14 +418,14 @@ typename SMCom<T>::request_list_iterator SMCom<T>::get_timedout_request(){
 #endif
 
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 bool SMCom<T>::is_request_registered_before(){
 	return get_request(&com_packet) != request_list.end();
 }
 #endif
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 SMCom_Status_t SMCom<T>::register_request(uint32_t timeout, request_response_callback fptr){
 	if(is_request_registered_before()){
@@ -445,7 +445,7 @@ SMCom_Status_t SMCom<T>::register_request(uint32_t timeout, request_response_cal
 #endif
 
 
-#if SMCOM_CONFIG_REQUEST_RESPONSE
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 SMCom_Status_t SMCom<T>::common_request(const uint8_t * raw_bytes, uint8_t len, uint32_t timeout, request_response_callback fptr){
 
@@ -786,7 +786,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 
 	rxflag.data_flag = 1;
 
-	#if SMCOM_CONFIG_REQUEST_RESPONSE
+	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	if(request_scheduler_enabled && evt == SM_RESPONSE_EVENT){
 		//Check that is this a response from a registered request before ?
 		request_list_iterator prev = check_incoming_response(packet);
