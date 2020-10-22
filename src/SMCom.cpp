@@ -318,29 +318,33 @@ SMCom<SMCOM_ONLY_MASTER>::~SMCom(){
 template<typename T>
 void SMCom<T>::increase_ms_timer(){
 	//Warn about this function, since we cannot use threads here, callbacks must return immeadiately
-	++timeout_counter;
+	if(request_scheduler_enabled){
+		++timeout_counter;
+	}
 }
 #endif
 
 #if SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::run_request_scheduler(){
-	//Check that do we have a timedout request?
-	request_list_iterator prev;
-	while( (prev = get_timedout_request() ) != request_list.end()){
-		//Actual request is the next of this
-		request_list_iterator it = std::next(prev);
-		if(it == request_list.end()){
-			printf("Error\n");
-			return;
+	if(request_scheduler_enabled){
+		//Check that do we have a timedout request?
+		request_list_iterator prev;
+		while( (prev = get_timedout_request() ) != request_list.end()){
+			//Actual request is the next of this
+			request_list_iterator it = std::next(prev);
+			if(it == request_list.end()){
+				printf("Error\n");
+				return;
+			}
+			if(it->fptr != NULL){
+				it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
+			}
+			else{
+				tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
+			}
+			request_list.erase_after(prev);
 		}
-		if(it->fptr != NULL){
-			it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
-		}
-		else{
-			tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
-		}
-		request_list.erase_after(prev);
 	}
 }
 #endif
