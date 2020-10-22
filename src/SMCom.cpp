@@ -818,17 +818,26 @@ size_t SMCom<T>::__available__(){
 template<typename T>
 SMCom_Status_t SMCom<T>::listener(void){
 	uint16_t len = HEADER_SIZE;
-	size_t avlb = __available__();
+	
 
 	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
 
-	if(avlb>=HEADER_SIZE){
+	uint8_t dummy = 0;
+	size_t avlb = __available__();
+	if(avlb >= HEADER_SIZE){
 		uint8_t * ptr = rx_buffer;
-		status = __read__(ptr,HEADER_SIZE);
+		while(__available__() > 0 && __read__(ptr,1) == SMCOM_STATUS_SUCCESS){
+			if(*ptr == MESSAGE_START){
+				++ptr;
+				break;
+			}
+		}
+		status = __read__(ptr,HEADER_SIZE-1);
+		ptr--;
 		if(status == SMCOM_STATUS_SUCCESS){
 			status = common_verify_message_header(ptr, &len,false);
-			if(is_packet_broken(status)) return status;
 		}
+		if(is_packet_broken(status)) return status;
 		ptr += HEADER_SIZE;
 		status = __read__(ptr,len);
 		if(status == SMCOM_STATUS_SUCCESS){
