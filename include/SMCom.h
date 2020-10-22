@@ -7,7 +7,7 @@
 #include <cstring>
 
 #ifndef SMCOM_CONFIG_REQUEST_RESPONSE
-#define SMCOM_CONFIG_REQUEST_RESPONSE 0
+#define SMCOM_CONFIG_REQUEST_RESPONSE 1
 #endif
 
 #if SMCOM_CONFIG_REQUEST_RESPONSE
@@ -148,6 +148,12 @@ typedef struct message_flags{
 } message_flags;
 
 
+typedef struct configuration_flags{
+	uint8_t static_buffer_provided:1;
+	uint8_t request_scheduler_enabled:1;
+} configuration_flags;
+
+
 enum SMCom_event_types : uint8_t{
 	SM_WRITE_EVENT = 0,
 	SM_REQUEST_EVENT = 1,
@@ -243,6 +249,7 @@ public:
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
 	void increase_ms_timer();
 	void run_request_scheduler();
+	void enable_request_scheduler();
 	#endif
 
 	uint16_t get_rx_buffer_size(){return rx_buf_size;};
@@ -324,7 +331,8 @@ private:
 	uint8_t * tx_buffer = NULL;
 	uint16_t tx_buf_size = 0;
 
-	uint8_t static_buffer_provided = 0;
+
+	configuration_flags conflag = (configuration_flags){0};
 
 	uint16_t message_end_index;
 

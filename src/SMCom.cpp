@@ -34,7 +34,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 
-	static_buffer_provided = 1;
+	conflag.static_buffer_provided = 1;
 }
 
 
@@ -108,7 +108,7 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
-	if(!static_buffer_provided){
+	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
 	}
@@ -153,7 +153,7 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
 
-	static_buffer_provided = 1;
+	conflag.static_buffer_provided = 1;
 }
 
 template<>
@@ -259,7 +259,7 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
-	if(!static_buffer_provided){
+	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
 	}
@@ -342,6 +342,13 @@ void SMCom<T>::run_request_scheduler(){
 		}
 		request_list.erase_after(prev);
 	}
+}
+#endif
+
+#if SMCOM_CONFIG_REQUEST_RESPONSE
+template<typename T>
+void SMCom<T>::enable_request_scheduler(){
+	conflag.request_scheduler_enabled = 1;
 }
 #endif
 
@@ -776,7 +783,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	rxflag.data_flag = 1;
 
 	#if SMCOM_CONFIG_REQUEST_RESPONSE
-	if(evt == SM_RESPONSE_EVENT){
+	if(conflag.request_scheduler_enabled && evt == SM_RESPONSE_EVENT){
 		//Check that is this a response from a registered request before ?
 		request_list_iterator prev = check_incoming_response(packet);
 		if(prev != request_list.end()){
