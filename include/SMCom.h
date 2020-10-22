@@ -150,7 +150,6 @@ typedef struct message_flags{
 
 typedef struct configuration_flags{
 	uint8_t static_buffer_provided:1;
-	uint8_t request_scheduler_enabled:1;
 } configuration_flags;
 
 
@@ -176,6 +175,14 @@ enum SMCom_headers: uint8_t {
 	DEFAULT_ID_8BIT = 254,
 	PUBLIC_ID_4BIT = 15,
 	DEFAULT_ID_4BIT = 14,
+};
+
+//Our message id values is represented by 6bits
+//Which starts from 0 to 2**6-1 = 63, so we will use the last values
+enum SMCom_special_messages : uint8_t{
+	SMCOM_MSG_PING__ = 61,
+	SMCOM_MSG_PONG__ = 62,
+	SMCOM_MSG_GET_VERSION__ = 63,
 };
 
 
@@ -249,7 +256,6 @@ public:
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	void increase_ms_timer();
 	void run_request_scheduler();
-	void enable_request_scheduler();
 	#endif
 
 	uint16_t get_rx_buffer_size(){return rx_buf_size;};
@@ -331,11 +337,7 @@ private:
 	uint8_t * tx_buffer = NULL;
 	uint16_t tx_buf_size = 0;
 
-
-	//configuration_flags conflag = (configuration_flags){0};
-
-	bool static_buffer_provided = false;
-	bool request_scheduler_enabled = false;
+	configuration_flags conflag = (configuration_flags){0};
 
 	uint16_t message_end_index;
 

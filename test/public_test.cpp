@@ -83,6 +83,7 @@ namespace public_messages{
 enum MESSAGES : uint8_t{
     GREETINGS = 0,
     PERSON,
+    EMPTY,
 };
 enum STATUS : uint8_t{
 	ERROR = 0,
@@ -109,6 +110,7 @@ typedef struct msg_person{
 
 
 static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+    printf("Packet length %d\n",packet->data_len);
     switch(packet->message_id){
         case public_messages::GREETINGS:{
             printf("Message GREETINGS invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
@@ -118,6 +120,11 @@ static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Stat
         }
         case public_messages::PERSON:{
             printf("Message PERSON invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+            break;
+        }
+        case public_messages::EMPTY:{
+            printf("Message EMPTY invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+
             break;
         }
         default:{
@@ -137,6 +144,11 @@ static void public_tx_event_handler_callback(SMCom_event_types event, SMCom_Stat
             printf("Status:%d\n",status);
             break;
         }
+        case public_messages::EMPTY:{
+            printf("Message 'EMPTY' is sent from[%d] to [%d]\n",packet->transmitter_id,packet->receiver_id);
+            printf("Status:%d\n",status);
+            break;
+        }
         default:{
             assert(0);
         }
@@ -151,7 +163,12 @@ void public_test(){
 
     public_messages::msg_greetings greet_from_a = {0};
     strcpy(greet_from_a.message,"Hello my name is A");
+
+
+    SMCom_Status_t listener_ret;
     
+    printf("===============================================================\n");
+
     //Message from A to B
     nodeA.write(idB,public_messages::GREETINGS,(uint8_t*)&greet_from_a, sizeof(public_messages::msg_greetings));
 
@@ -159,7 +176,18 @@ void public_test(){
     nodeA.copy_txqueue_into_another_rxqueue(nodeB);
     nodeB.print_rx();
 
-    SMCom_Status_t listener_ret = nodeB.listener();
+    listener_ret = nodeB.listener();
+    printf("Listener returned %s\n",nodeB.resolve_status(listener_ret));
+
+    printf("===============================================================\n");
+
+    nodeA.write(idB,public_messages::EMPTY,NULL,0);
+
+    nodeA.print_tx();
+    nodeA.copy_txqueue_into_another_rxqueue(nodeB);
+    nodeB.print_rx();
+
+    listener_ret = nodeB.listener();
     printf("Listener returned %s\n",nodeB.resolve_status(listener_ret));
     
 }

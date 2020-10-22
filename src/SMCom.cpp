@@ -34,7 +34,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 
-	static_buffer_provided = true;
+	conflag.static_buffer_provided = true;
 }
 
 
@@ -108,7 +108,7 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 
 template<>
 SMCom<SMCOM_PRIVATE>::~SMCom(){
-	if(!static_buffer_provided){
+	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
 	}
@@ -153,7 +153,7 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
 
-	static_buffer_provided = true;
+	conflag.static_buffer_provided = true;
 }
 
 template<>
@@ -259,7 +259,7 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 
 template<>
 SMCom<SMCOM_PUBLIC>::~SMCom(){
-	if(!static_buffer_provided){
+	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
 	}
@@ -318,43 +318,34 @@ SMCom<SMCOM_ONLY_MASTER>::~SMCom(){
 template<typename T>
 void SMCom<T>::increase_ms_timer(){
 	//Warn about this function, since we cannot use threads here, callbacks must return immeadiately
-	if(request_scheduler_enabled){
-		++timeout_counter;
-	}
+	++timeout_counter;
 }
 #endif
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::run_request_scheduler(){
-	if(request_scheduler_enabled){
-		//Check that do we have a timedout request?
-		request_list_iterator prev;
-		while( (prev = get_timedout_request() ) != request_list.end()){
-			//Actual request is the next of this
-			request_list_iterator it = std::next(prev);
-			if(it == request_list.end()){
-				printf("Error\n");
-				return;
-			}
-			if(it->fptr != NULL){
-				it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
-			}
-			else{
-				tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
-			}
-			request_list.erase_after(prev);
+	//Check that do we have a timedout request?
+	request_list_iterator prev;
+	while( (prev = get_timedout_request() ) != request_list.end()){
+		//Actual request is the next of this
+		request_list_iterator it = std::next(prev);
+		if(it == request_list.end()){
+			printf("Error\n");
+			return;
 		}
+		if(it->fptr != NULL){
+			it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
+		}
+		else{
+			tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
+		}
+		request_list.erase_after(prev);
 	}
+	
 }
 #endif
 
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-void SMCom<T>::enable_request_scheduler(){
-	request_scheduler_enabled = 1;
-}
-#endif
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
@@ -580,8 +571,10 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	txit += sizeof(com_packet);
 	txflag.rx_tx_id_flag = 1;
 
-	memcpy(tx_buffer+txit,(uint8_t *)buffer,len);
-	txit += len;
+	if(len > 0){
+		memcpy(tx_buffer+txit,(uint8_t *)buffer,len);
+		txit += len;
+	}
 	txflag.data_flag = 1;
 
 	if(packet_size > possible_packet_size){
@@ -638,11 +631,13 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 
 	txflag.rx_tx_id_flag = 1;
 
-	//Data sequence
-	crc = get_crc_ibm(buffer,len,crc);
-	ret = __write__(buffer,len);
-	if(ret != SMCOM_STATUS_SUCCESS) return ret;
-
+	if(len){
+		//Data sequence
+		crc = get_crc_ibm(buffer,len,crc);
+		ret = __write__(buffer,len);
+		if(ret != SMCOM_STATUS_SUCCESS) return ret;	
+	}
+	
 	if(packet_size > possible_packet_size){
 		//Now add padding, user wants to fix message size
 		uint16_t padding = (packet_size - possible_packet_size);
@@ -670,13 +665,13 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 		return SMCOM_STATUS_PORT_BUSY;
 	}
 
-	if(buffer == NULL && len != 0)
+	if(buffer == NULL && len != 0){
 		return SMCOM_STATUS_FAIL;
+	}
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 
 	clear_tx_flag();
-
 
 	if(tx_buffer && tx_buf_size){
 		ret = common_write_txbuffer(buffer,len);
@@ -684,7 +679,6 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 	else{
 		ret = common_write_polling(buffer,len);
 	}
-
 	//if it is a request we won't call general tx handler because each request has its own callback function
 	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
@@ -697,7 +691,7 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 template<typename T>
 SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
 
-	if(raw_bytes == NULL && *len != 0) return SMCOM_STATUS_NULL_MESSAGE;
+	if(raw_bytes == NULL) return SMCOM_STATUS_NULL_MESSAGE;
 
 	clear_rx_flag();
 	rx_iter = 0;
@@ -741,7 +735,7 @@ template<typename T>
 SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer){
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
-	if(raw_bytes == NULL && len != 0) return SMCOM_STATUS_NULL_MESSAGE;
+	if(raw_bytes == NULL) return SMCOM_STATUS_NULL_MESSAGE;
 
 	if(rxflag.rx_tx_id_flag == 0) ret = SMCOM_STATUS_PORT_BUSY;
 	if(rxflag.start_byte_flag == 0) ret =  SMCOM_STATUS_START_BYTE_ERROR;
@@ -787,7 +781,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	rxflag.data_flag = 1;
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	if(request_scheduler_enabled && evt == SM_RESPONSE_EVENT){
+	if(evt == SM_RESPONSE_EVENT){
 		//Check that is this a response from a registered request before ?
 		request_list_iterator prev = check_incoming_response(packet);
 		if(prev != request_list.end()){
