@@ -332,7 +332,10 @@ private:
 	uint16_t tx_buf_size = 0;
 
 
-	configuration_flags conflag = (configuration_flags){0};
+	//configuration_flags conflag = (configuration_flags){0};
+
+	bool static_buffer_provided = false;
+	bool request_scheduler_enabled = false;
 
 	uint16_t message_end_index;
 
