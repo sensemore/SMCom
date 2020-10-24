@@ -134,6 +134,7 @@ enum SMCom_Status_t : uint8_t{
 	SMCOM_STATUS_END_BYTE_ERROR,
 	SMCOM_STATUS_HEADER_LENGTH_ERROR,
 	SMCOM_STATUS_MESSAGE_LENGTH_ERROR,
+	SMCOM_STATUS_MESSAGE_ID_ERROR,
 	SMCOM_STATUS_NULL_MESSAGE,
 };
 
@@ -179,9 +180,11 @@ enum SMCom_headers: uint8_t {
 
 //Our message id values is represented by 6bits
 //Which starts from 0 to 2**6-1 = 63, so we will use the last values
+//Even though we have nothing, maybe next versions will use the following structures
+#define SMCOM_SPECIAL_MESSAGE_START_ID 60
+#define SMCOM_MAX_USER_MESSAGE_ID (SMCOM_SPECIAL_MESSAGE_START_ID - 1)
 enum SMCom_special_messages : uint8_t{
-	SMCOM_MSG_PING__ = 61,
-	SMCOM_MSG_PONG__ = 62,
+	SMCOM_MSG_PING__ = 62,
 	SMCOM_MSG_GET_VERSION__ = 63,
 };
 
@@ -219,6 +222,12 @@ public:
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
 	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
+
+	SMCom_Status_t ping(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
+	SMCom_Status_t ping(uint32_t timeout, request_response_callback fptr);
+
+	SMCom_Status_t get_version(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
+	SMCom_Status_t get_version(uint32_t timeout, request_response_callback fptr);
 	#endif
 	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
@@ -234,7 +243,7 @@ public:
 	//If given message length is smaller than the packet size, we add padding bytes to fullfill the condition of packet size
 	//If it is greater than the packet size we return an error
 	void set_fixed_packet_size(uint16_t packet_size);
-	uint64_t get_version();
+	uint64_t GET_SMCOM_VERSION();
 
 	uint8_t get_packet_data_length(const CT * packet);
 	CT * duplicate_message_packet(const CT * packet);
@@ -276,6 +285,7 @@ public:
 			"SMCOM_END_BYTE_ERROR",
 			"SMCOM_HEADER_LENGTH_ERROR",
 			"SMCOM_MESSAGE_LENGTH_ERROR",
+			"SMCOM_MESSAGE_ID_ERROR",
 			"SMCOM_NULL_MESSAGE",
 		};
 		return str_SMCom_Status_t[t];
@@ -304,6 +314,7 @@ private:
 	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len);	
 	SMCom_Status_t common_finalize_queue();
 
+	SMCom_Status_t respond_smcom_special_messages(CT * packet);
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	//@TODO

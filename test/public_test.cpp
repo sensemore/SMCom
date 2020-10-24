@@ -167,7 +167,7 @@ void public_test(){
 
     SMCom_Status_t listener_ret;
     
-    printf("===============================================================\n");
+    printf("\n\n===============================================================\n\n");
 
     //Message from A to B
     nodeA.write(idB,public_messages::GREETINGS,(uint8_t*)&greet_from_a, sizeof(public_messages::msg_greetings));
@@ -179,7 +179,7 @@ void public_test(){
     listener_ret = nodeB.listener();
     printf("Listener returned %s\n",nodeB.resolve_status(listener_ret));
 
-    printf("===============================================================\n");
+    printf("\n\n===============================================================\n\n");
 
     nodeA.write(idB,public_messages::EMPTY,NULL,0);
 
@@ -189,5 +189,7 @@ void public_test(){
 
     listener_ret = nodeB.listener();
     printf("Listener returned %s\n",nodeB.resolve_status(listener_ret));
-    
+
+
+    printf("\n\n===============================================================\n\n");    
 }

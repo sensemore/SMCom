@@ -40,6 +40,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	return common_write(buffer,len);
@@ -47,6 +48,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * b
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len){
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
 	com_packet.data_len = len;
@@ -56,14 +58,32 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, ui
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_id = message_id;
 	return common_request(buffer,len,timeout,fptr);
+}
+#endif
+
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+template <>
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::ping(uint32_t timeout, request_response_callback fptr){
+	com_packet.message_id = SMCom_special_messages::SMCOM_MSG_PING__;
+	return common_request(NULL,0,timeout,fptr);
+}
+#endif
+
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+template <>
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::get_version(uint32_t timeout, request_response_callback fptr){
+	com_packet.message_id = SMCom_special_messages::SMCOM_MSG_GET_VERSION__;
+	return common_request(NULL,0,timeout,fptr);
 }
 #endif
 
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = message_id;
 	return common_write(buffer,len);
@@ -71,10 +91,20 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t *
 
 template<>
 SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, const uint8_t * buffer, uint8_t len){
+	if(inc_packet->message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
 	return common_write(buffer,len);
 }
+
+template<>
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond_smcom_special_messages(SMCOM_PRIVATE * packet){
+
+	com_packet.message_type = SMCom_message_types::RESPONSE;
+	com_packet.message_id = packet->message_id;
+	return common_write(NULL,0);
+}
+
 
 
 template<>
@@ -165,6 +195,8 @@ void SMCom<SMCOM_PUBLIC>::assign_new_id(uint8_t id){
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
 
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
+
 	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
@@ -182,6 +214,8 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::write_public(uint8_t message_id, const uint8
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template <>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr){
+	
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
@@ -189,8 +223,29 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::request(uint8_t receiver_id,uint8_t message_
 }
 #endif
 
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+template <>
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::ping(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr){
+	com_packet.message_id = SMCom_special_messages::SMCOM_MSG_PING__;
+	com_packet.receiver_id = receiver_id;
+	return common_request(NULL,0,timeout,fptr);
+}
+#endif
+
+#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+template <>
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::get_version(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr){
+	com_packet.message_id = SMCom_special_messages::SMCOM_MSG_GET_VERSION__;
+	com_packet.receiver_id = receiver_id;
+	return common_request(NULL,0,timeout,fptr);
+}
+#endif
+
+
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
+
+	if(inc_packet->message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
@@ -201,6 +256,8 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, con
 template<>
 SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
 
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
+
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
@@ -210,7 +267,20 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond_smcom_special_messages(SMCOM_PUBLIC * packet){
+
+	com_packet.message_type = SMCom_message_types::RESPONSE;
+	com_packet.message_id = packet->message_id;
+	com_packet.receiver_id = packet->transmitter_id;
+
+	return common_write(NULL,0);
+}
+
+
+template<>
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len){
+
+	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
@@ -530,7 +600,7 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 	txflag.crc_flag = 1;
 
 
-	if(tx_event_handler_callback_ptr!=NULL){
+	if(tx_event_handler_callback_ptr != NULL){
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 	}
 
@@ -688,6 +758,7 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 
 
 
+
 template<typename T>
 SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
 
@@ -797,6 +868,16 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	}
 	#endif
 
+	if(packet != NULL && evt == SM_REQUEST_EVENT && packet->message_id >= SMCOM_SPECIAL_MESSAGE_START_ID){
+		if(ret != SMCOM_STATUS_CRC_ERROR){
+			respond_smcom_special_messages(packet);
+			//Quietly return default like we had no messages
+			ret = SMCOM_STATUS_DEFAULT;
+			//set packet to null so we are not gonna call rxevent handler since we have already invoked this function
+		}
+		packet = NULL;
+	}
+
 	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
 		rx_event_handler_callback_ptr(evt,ret,packet);
 	}
@@ -804,6 +885,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	clear_rx_flag();
 	return ret;
 }
+
 
 template<typename T>
 SMCom_Status_t SMCom<T>::__read__(uint8_t * buffer, uint16_t len){
@@ -898,7 +980,7 @@ void SMCom<T>::clear_rx_flag(){
 }
 
 template<typename T>
-uint64_t SMCom<T>::get_version(){
+uint64_t SMCom<T>::GET_SMCOM_VERSION(){
 	return SMCOM_VERSION;
 }
 
