@@ -614,7 +614,6 @@ template<typename T>
 SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len){
 	//before calling this function check that txbuffer is not null
 
-	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
 
@@ -903,8 +902,6 @@ SMCom_Status_t SMCom<T>::listener(void){
 	
 
 	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
-
-	uint8_t dummy = 0;
 	size_t avlb = __available__();
 	if(avlb >= HEADER_SIZE){
 		uint8_t * ptr = rx_buffer;
