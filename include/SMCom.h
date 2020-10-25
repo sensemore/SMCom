@@ -189,6 +189,11 @@ enum SMCom_special_messages : uint8_t{
 };
 
 
+typedef struct smcom_message_get_version_struct__{
+	uint32_t version;
+}__attribute__((packed)) smcom_message_get_version_struct__;
+
+
 
 template <typename CT>
 class SMCom{
@@ -315,6 +320,7 @@ private:
 	SMCom_Status_t common_finalize_queue();
 
 	SMCom_Status_t respond_smcom_special_messages(CT * packet);
+	SMCom_Status_t common_respond_smcom_special_messages(CT * packet);
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	//@TODO

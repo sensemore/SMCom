@@ -102,7 +102,7 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond_smcom_special_messages(SMCOM_PRIVAT
 
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = packet->message_id;
-	return common_write(NULL,0);
+	return common_respond_smcom_special_messages(packet);
 }
 
 
@@ -273,7 +273,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond_smcom_special_messages(SMCOM_PUBLIC 
 	com_packet.message_id = packet->message_id;
 	com_packet.receiver_id = packet->transmitter_id;
 
-	return common_write(NULL,0);
+	return common_respond_smcom_special_messages(packet);
 }
 
 
@@ -309,7 +309,6 @@ template<>
 typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_incoming_response(SMCOM_PUBLIC * inc_packet){
 	//packet is (response) from another device, we'll check did we have a request for this response
 	//Iterate in the list and check their message id + their transmitter id must be our request receiver id
-	printf("Incoming packet transmitter_id %d | receiver_id %d\n",inc_packet->transmitter_id,inc_packet->receiver_id );
 	if(!request_list.empty()){
 		auto it = request_list.before_begin();
 		auto nextit = std::next(it);
@@ -401,7 +400,6 @@ void SMCom<T>::run_request_scheduler(){
 		//Actual request is the next of this
 		request_list_iterator it = std::next(prev);
 		if(it == request_list.end()){
-			printf("Error\n");
 			return;
 		}
 		if(it->fptr != NULL){
@@ -883,6 +881,20 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 
 	clear_rx_flag();
 	return ret;
+}
+
+template<typename T>
+SMCom_Status_t SMCom<T>::common_respond_smcom_special_messages(T * packet){
+
+	switch(packet->message_id){
+		case SMCOM_MSG_GET_VERSION__:{
+			smcom_message_get_version_struct__ vs;
+			vs.version = SMCOM_VERSION;
+			return common_write((uint8_t*)&vs,sizeof(smcom_message_get_version_struct__));
+		}
+	}
+
+	return common_write(NULL,0);
 }
 
 
