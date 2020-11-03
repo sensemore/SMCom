@@ -934,6 +934,9 @@ SMCom_Status_t SMCom<T>::listener(void){
 		if(status == SMCOM_STATUS_SUCCESS){
 			status = common_handle_message_data(ptr,len,false);
 		}
+		else{
+			clear_rx_flag();
+		}
 	}
 	return status;
 }
