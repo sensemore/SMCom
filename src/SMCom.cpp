@@ -396,7 +396,7 @@ template<typename T>
 void SMCom<T>::run_request_scheduler(){
 	//Check that do we have a timedout request?
 	request_list_iterator prev;
-	while( (prev = get_timedout_request() ) != request_list.end()){
+	while( (prev = get_timedout_request()) != request_list.end()){
 		//Actual request is the next of this
 		request_list_iterator it = std::next(prev);
 		if(it == request_list.end()){
@@ -469,6 +469,7 @@ typename SMCom<T>::request_list_iterator SMCom<T>::get_timedout_request(){
 				return it;
 			}
 			it = nextit;
+			if(it == request_list.end()) break;
 			nextit = std::next(it);
 		}while(nextit != request_list.end());
 	}
@@ -967,9 +968,11 @@ void SMCom<T>::set_fixed_packet_size(uint16_t packet_size){
 
 template<typename CT>
 CT * SMCom<CT>::duplicate_message_packet(const CT * packet){
-	uint16_t sz = sizeof(packet) + packet->data_len;
+	uint16_t sz = sizeof(CT) + packet->data_len;
 	CT * p = (CT *) malloc(sz);
-	memcpy(p,packet,sz);
+	if(p != NULL){
+		memcpy(p,packet,sz);
+	}
 	return p;
 }
 
