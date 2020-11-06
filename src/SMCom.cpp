@@ -849,7 +849,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	rxflag.data_flag = 1;
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	if(evt == SM_RESPONSE_EVENT){
+	if(evt == SM_RESPONSE_EVENT || evt == SM_WRITE_EVENT){
 		//Check that is this a response from a registered request before ?
 		request_list_iterator prev = check_incoming_response(packet);
 		if(prev != request_list.end()){

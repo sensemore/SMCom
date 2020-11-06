@@ -23,7 +23,7 @@
 #define SMCOM_PATCH_LEVEL__ 	0
 #define SMCOM_MINOR_VERSION__ 	1
 #define SMCOM_MAJOR_VERSION__ 	0
-#define SMCOM_VERSION_STRING	"0.1.0"
+#define SMCOM_VERSION_STRING	"0.1.1"
 #define SMCOM_VERSION (SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__
 
 /*
@@ -299,6 +299,11 @@ public:
 	static const uint8_t HEADER_SIZE = sizeof(CT)+1;
 	static const uint8_t MAX_MSG_LENGTH = 0xFF;
 
+protected:
+
+	void clear_tx_flag();
+	void clear_rx_flag();
+
 private:
 
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
@@ -342,8 +347,6 @@ private:
 	SMCom_Status_t register_request(uint32_t timeout, request_response_callback fptr);
 	#endif
 
-	void clear_tx_flag();
-	void clear_rx_flag();
 
 	CT com_packet;
 
