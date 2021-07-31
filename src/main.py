@@ -1,0 +1,3 @@
+import SMCom
+
+s = SMCom()
