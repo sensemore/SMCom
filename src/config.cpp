@@ -5,7 +5,11 @@
 
 namespace py = pybind11;
 
-// Fix required to template class : wrapping void is not working at all
+// compile code :
+// c++ -shared -fPIC $(python3 -m pybind11 --includes) config.cpp SMCom.cpp public_test.cpp -o SMCom$(python3-config --extension-suffix)
+
+
+// Important fix required to template class : wrapping void is not working at all
 
 class PyNode : public public_node {
 public:
