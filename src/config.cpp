@@ -1,9 +1,11 @@
 #include "SMCom.h"
 #include "public_test.h"
 #include <pybind11/pybind11.h>
+#include <string.h>
 
 namespace py = pybind11;
 
+// Fix required to template class : wrapping void is not working at all
 
 class PyNode : public public_node {
 public:
@@ -50,9 +52,85 @@ public:
     }
 };
 
+// template<typename T>
+// void declareSMCom(py::module &m, const std::string& typestr) {
+//     using Class = SMCom<T>;
+//     std::string pyclass_name = std::string("SMCom") + typestr;
+//     py::class_<Class>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
+//     .def("rx_event_handler_callback", Class::rx_event_handler_callback)
+//     .def("tx_event_handler_callback", Class::tx_event_handler_callback)
+//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+// 	.def("request_response_callback", Class::request_response_callback)
+// 	#endif
+//     .def(py::init<uint16_t, uint16_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>()) //maybe typename Class::rx_event_handler_callback not sure
+//     .def(py::init<uint16_t, uint16_t, uint8_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
+//     .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
+//     .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
+//     .def("verify_message_header", &Class::verify_message_header)
+//     .def("handle_message_data", &Class::handle_message_data)
+//     .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t)>(&Class::write))
+//     .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&Class::write))
+//     .def("write_public", &Class::write_public)
+//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+//     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
+//     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
+//     .def("ping", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint32_t, Class::request_response_callback)>(&Class::ping))
+//     .def("ping", static_cast<SMCom_Status_t (Class::*)(uint32_t, Class::request_response_callback)>(&Class::ping))
+//     .def("get_version", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint32_t, Class::request_response_callback)>(&Class::get_version))
+//     .def("get_version", static_cast<SMCom_Status_t (Class::*)(uint32_t, Class::request_response_callback)>(&Class::get_version))
+//     #endif
+//     .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t)>(&Class::respond))
+//     .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&Class::respond))
+//     .def("respond", static_cast<SMCom_Status_t (Class::*)(const T*, const uint8_t*, uint8_t)>(&Class::respond))
+//     .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&Class::start_write_queue))
+//     .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t)>(&Class::start_write_queue))
+//     .def("push_to_queue", &Class::push_to_queue)
+//     .def("finalize_queue", &Class::finalize_queue)
+//     .def("set_fixed_packet_size", &Class::set_fixed_packet_size)
+//     .def("GET_SMCOM_VERSION", &Class::GET_SMCOM_VERSION)
+//     .def("get_packet_data_length", &Class::get_packet_data_length)
+//     .def("duplicate_message_packet", &Class::duplicate_message_packet) /// ARE VIRTUALS SHOULD BE DEFINED IN THIS ?
+//     .def("listener", &Class::listener)
+//     .def("is_packet_broken", &Class::is_packet_broken)
+//     .def("is_crc_failed", &Class::is_crc_failed)
+//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+//     .def("increase_ms_timer", &Class::increase_ms_timer)
+//     .def("run_request_scheduler", &Class::run_request_scheduler)
+//     #endif
+//     .def("get_rx_buffer_size", &Class::get_rx_buffer_size)
+//     .def("assign_new_id", &Class::assign_new_id)
+//     .def_static("resolve_status", &Class::resolve_status)
+//     .def_readwrite("HEADER_SIZE", &Class::HEADER_SIZE)
+//     .def_readwrite("MAX_MSG_LENGTH", &Class::MAX_MSG_LENGTH);
+// }
+
+
+
 PYBIND11_MODULE(SMCom, m) {
+    py::enum_<SMCom_Status_t>(m, "SMCom_Status_t")
+        .value("SMCOM_STATUS_DEFAULT", SMCom_Status_t::SMCOM_STATUS_DEFAULT)
+        .value("SMCOM_STATUS_SUCCESS", SMCom_Status_t::SMCOM_STATUS_SUCCESS)
+        .value("SMCOM_STATUS_PORT_BUSY", SMCom_Status_t::SMCOM_STATUS_PORT_BUSY)
+        .value("SMCOM_STATUS_TIMEOUT", SMCom_Status_t::SMCOM_STATUS_TIMEOUT)
+        .value("SMCOM_STATUS_FAIL", SMCom_Status_t::SMCOM_STATUS_FAIL)
+        .value("SMCOM_STATUS_RX_ERROR", SMCom_Status_t::SMCOM_STATUS_RX_ERROR)
+        .value("SMCOM_STATUS_CRC_ERROR", SMCom_Status_t::SMCOM_STATUS_CRC_ERROR)
+        .value("SMCOM_STATUS_START_BYTE_ERROR", SMCom_Status_t::SMCOM_STATUS_START_BYTE_ERROR)
+        .value("SMCOM_STATUS_END_BYTE_ERROR", SMCom_Status_t::SMCOM_STATUS_END_BYTE_ERROR)
+        .value("SMCOM_STATUS_HEADER_LENGTH_ERROR", SMCom_Status_t::SMCOM_STATUS_HEADER_LENGTH_ERROR)
+        .value("SMCOM_STATUS_MESSAGE_ID_ERROR", SMCom_Status_t::SMCOM_STATUS_MESSAGE_ID_ERROR)
+        .value("SMCOM_STATUS_NULL_MESSAGE", SMCom_Status_t::SMCOM_STATUS_NULL_MESSAGE)
+        .export_values();
+
+    py::enum_<SMCom_event_types>(m, "SMCom_event_types")
+        .value("SM_WRITE_EVENT", SMCom_event_types::SM_WRITE_EVENT)
+        .value("SM_REQUEST_EVENT", SMCom_event_types::SM_REQUEST_EVENT)
+        .value("SM_RESPONSE_EVENT", SMCom_event_types::SM_RESPONSE_EVENT)
+        .value("SM_INDICATE_EVENT", SMCom_event_types::SM_INDICATE_EVENT)
+        .export_values();
+
     py::class_<public_node, PyNode>(m, "public_node")
-        .def(py::init<uint16_t,uint16_t,uint8_t, public_node::rx_event_handler_callback, public_node::tx_event_handler_callback,std::string>())
+        .def(py::init<uint16_t, uint16_t, uint8_t, public_node::rx_event_handler_callback, public_node::tx_event_handler_callback, std::string>())
         .def("__read__", &public_node::__read__)
         .def("__write__", &public_node::__write__)
         .def("available", &public_node::__available__)
@@ -63,206 +141,6 @@ PYBIND11_MODULE(SMCom, m) {
         .def_readwrite("write_queue", &public_node::write_queue)
         .def_readwrite("read_queue", &public_node::read_queue)
         .def_readwrite("name", &public_node::name);
+        // declareSMCom<SMCOM_PUBLIC>(m, "SMCOM_PUBLIC");
+        // declareSMCom<SMCOM_PRIVATE>(m, "SMCOM_PRIVATE");
 }
-
-template<typename T>
-void declare_array(py::module &m, std::string &typestr) {
-    using Class = SMCom<T>;
-    std::string pyclass_name = std::string("SMCom") + typestr;
-    py::class_<Class>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
-    .def(py::init<uint16_t, uint16_t, rx_event_handler_callback, tx_event_handler_callback>()) //maybe Class::rx_event_handler_callback not sure
-    .def(py::init<uint16_t, uint16_t, uint8_t, rx_event_handler_callback, tx_event_handler_callback>())
-    .def("size", &Class::size)
-    .def("width", &Class::width)
-    .def("height", &Class::height);
-}
-
-template <typename CT>
-class SMCom{
-public:
-	typedef void (*rx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
-	rx_event_handler_callback rx_event_handler_callback_ptr = NULL;
-
-	typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
-	tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
-	#endif
-	
-	////Constructors with dynamic buffers, uses C++ new allocater
-	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	//Constructors with static buffers
-	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	~SMCom();
-
-	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
-	SMCom_Status_t handle_message_data(const uint8_t * raw_bytes, uint16_t len);
-
-	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
-
-	SMCom_Status_t write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len);
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
-	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
-
-	SMCom_Status_t ping(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
-	SMCom_Status_t ping(uint32_t timeout, request_response_callback fptr);
-
-	SMCom_Status_t get_version(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
-	SMCom_Status_t get_version(uint32_t timeout, request_response_callback fptr);
-	#endif
-	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len);
-	
-
-
-	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
-	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len);
-	SMCom_Status_t push_to_queue(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t finalize_queue();
-
-	//If given message length is smaller than the packet size, we add padding bytes to fullfill the condition of packet size
-	//If it is greater than the packet size we return an error
-	void set_fixed_packet_size(uint16_t packet_size);
-	uint64_t GET_SMCOM_VERSION();
-
-	uint8_t get_packet_data_length(const CT * packet);
-	CT * duplicate_message_packet(const CT * packet);
-
-	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) = 0;
-	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
-	virtual size_t __available__();
-	//In order to call listener user must provide __read__ and __available__ functions
-	SMCom_Status_t listener(void);
-
-	bool is_packet_broken(SMCom_Status_t stat){
-		return stat >= SMCOM_STATUS_FAIL;
-	}
-	bool is_crc_failed(SMCom_Status_t stat){
-		return stat == SMCOM_STATUS_CRC_ERROR;
-	}
-
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	void increase_ms_timer();
-	void run_request_scheduler();
-	#endif
-
-	uint16_t get_rx_buffer_size(){return rx_buf_size;};
-	void assign_new_id(uint8_t id);
-
-	
-
-	static const char * resolve_status(SMCom_Status_t t){
-		static const char * str_SMCom_Status_t[] = {
-			"SMCOM_DEFAULT",
-			"SMCOM_SUCCESS",
-			"SMCOM_PORT_BUSY",
-			"SMCOM_TIMEOUT",
-			"SMCOM_FAIL",
-			"SMCOM_RX_ERROR",
-			"SMCOM_CRC_ERROR",
-			"SMCOM_START_BYTE_ERROR",
-			"SMCOM_END_BYTE_ERROR",
-			"SMCOM_HEADER_LENGTH_ERROR",
-			"SMCOM_MESSAGE_LENGTH_ERROR",
-			"SMCOM_MESSAGE_ID_ERROR",
-			"SMCOM_NULL_MESSAGE",
-		};
-		return str_SMCom_Status_t[t];
-	}
-
-	static const uint8_t HEADER_SIZE = sizeof(CT)+1;
-	static const uint8_t MAX_MSG_LENGTH = 0xFF;
-
-protected:
-
-	void clear_tx_flag();
-	void clear_rx_flag();
-
-private:
-
-	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len);
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	SMCom_Status_t common_request(const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr);
-	#endif
-	
-	SMCom_Status_t common_read_internal(const uint8_t * raw_bytes, uint8_t len,uint8_t end_byte_start_offset);
-	SMCom_Status_t additional_buffer_check();
-	
-	SMCom_Status_t common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer);
-	SMCom_Status_t common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer);
-
-	SMCom_Status_t common_start_write_queue();
-	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len);	
-	SMCom_Status_t common_finalize_queue();
-
-	SMCom_Status_t respond_smcom_special_messages(CT * packet);
-	SMCom_Status_t common_respond_smcom_special_messages(CT * packet);
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	//@TODO
-	//Maybe we can add another request packet without fptr????
-	typedef struct request_packet{
-		CT packet;
-		uint32_t timeout_end;
-		request_response_callback fptr;
-	}request_packet;
-	
-	std::forward_list<request_packet> request_list;
-	typedef typename std::forward_list<request_packet>::iterator request_list_iterator; 
-
-	bool is_request_registered_before();
-	bool remove_request_from_list(CT * packet);
-	request_list_iterator get_request(CT * packet);
-	request_list_iterator get_timedout_request();
-	request_list_iterator check_incoming_response(CT * inc_packet);
-	SMCom_Status_t register_request(uint32_t timeout, request_response_callback fptr);
-	#endif
-
-
-	CT com_packet;
-
-	uint8_t * rx_buffer = NULL;
-	uint16_t rx_iter = 0;
-	uint16_t rx_buf_size = 0;
-	
-	uint8_t * tx_buffer = NULL;
-	uint16_t tx_buf_size = 0;
-
-	configuration_flags conflag = (configuration_flags){0};
-
-	uint16_t message_end_index;
-
-	message_flags rxflag;
-	message_flags txflag;
-
-	uint16_t packet_size = 0;
-
-	uint16_t last_crc;
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	//Timeout counter counts miliseconds
-	uint32_t timeout_counter = 0;
-	#endif
-
-	//Polynomial x^16 + x^12 + x^5 + 1
-	#define POLY_CCITT 0x1021 //'0b1000000100001'
-	//Polynomial x^16 + x^15 + x^2 + 1
-	#define POLY_IBM 0x8005 //'0b1000000000000101'
-
-	#define CRC_IBM_SEED 0xffff
-	#define CRC_CCITT_SEED 0x1d0f
-
-	uint16_t compute_crc_ibm(uint16_t crc, uint8_t data);
-	uint16_t get_crc_ibm(const uint8_t * buffer, uint8_t len,uint16_t crc = CRC_IBM_SEED);
-};
