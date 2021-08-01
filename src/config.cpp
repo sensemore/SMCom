@@ -56,57 +56,56 @@ public:
     }
 };
 
-// template<typename T>
-// void declareSMCom(py::module &m, const std::string& typestr) {
-//     using Class = SMCom<T>;
-//     std::string pyclass_name = std::string("SMCom") + typestr;
-//     py::class_<Class>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
-//     .def("rx_event_handler_callback", Class::rx_event_handler_callback)
-//     .def("tx_event_handler_callback", Class::tx_event_handler_callback)
-//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-// 	.def("request_response_callback", Class::request_response_callback)
-// 	#endif
-//     .def(py::init<uint16_t, uint16_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>()) //maybe typename Class::rx_event_handler_callback not sure
-//     .def(py::init<uint16_t, uint16_t, uint8_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
-//     .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
-//     .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
-//     .def("verify_message_header", &Class::verify_message_header)
-//     .def("handle_message_data", &Class::handle_message_data)
-//     .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t)>(&Class::write))
-//     .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&Class::write))
-//     .def("write_public", &Class::write_public)
-//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-//     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
-//     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
-//     .def("ping", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint32_t, Class::request_response_callback)>(&Class::ping))
-//     .def("ping", static_cast<SMCom_Status_t (Class::*)(uint32_t, Class::request_response_callback)>(&Class::ping))
-//     .def("get_version", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint32_t, Class::request_response_callback)>(&Class::get_version))
-//     .def("get_version", static_cast<SMCom_Status_t (Class::*)(uint32_t, Class::request_response_callback)>(&Class::get_version))
-//     #endif
-//     .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t)>(&Class::respond))
-//     .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&Class::respond))
-//     .def("respond", static_cast<SMCom_Status_t (Class::*)(const T*, const uint8_t*, uint8_t)>(&Class::respond))
-//     .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&Class::start_write_queue))
-//     .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t)>(&Class::start_write_queue))
-//     .def("push_to_queue", &Class::push_to_queue)
-//     .def("finalize_queue", &Class::finalize_queue)
-//     .def("set_fixed_packet_size", &Class::set_fixed_packet_size)
-//     .def("GET_SMCOM_VERSION", &Class::GET_SMCOM_VERSION)
-//     .def("get_packet_data_length", &Class::get_packet_data_length)
-//     .def("duplicate_message_packet", &Class::duplicate_message_packet) /// ARE VIRTUALS SHOULD BE DEFINED IN THIS ?
-//     .def("listener", &Class::listener)
-//     .def("is_packet_broken", &Class::is_packet_broken)
-//     .def("is_crc_failed", &Class::is_crc_failed)
-//     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-//     .def("increase_ms_timer", &Class::increase_ms_timer)
-//     .def("run_request_scheduler", &Class::run_request_scheduler)
-//     #endif
-//     .def("get_rx_buffer_size", &Class::get_rx_buffer_size)
-//     .def("assign_new_id", &Class::assign_new_id)
-//     .def_static("resolve_status", &Class::resolve_status)
-//     .def_readwrite("HEADER_SIZE", &Class::HEADER_SIZE)
-//     .def_readwrite("MAX_MSG_LENGTH", &Class::MAX_MSG_LENGTH);
-// }
+template<typename T>
+void declareSMCom(py::module &m, const std::string& typestr) {
+    std::string pyclass_name = std::string("SMCom") + typestr;
+    py::class_<SMCom<T>>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
+    .def("rx_event_handler_callback", SMCom<T>::rx_event_handler_callback)
+    .def("tx_event_handler_callback", SMCom<T>::tx_event_handler_callback)
+    #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	.def("request_response_callback", SMCom<T>::request_response_callback)
+	#endif
+    .def(py::init<uint16_t, uint16_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>()) //maybe SMCom<T>::rx_event_handler_callback not sure
+    .def(py::init<uint16_t, uint16_t, uint8_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
+    .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
+    .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
+    .def("verify_message_header", &SMCom<T>::verify_message_header)
+    .def("handle_message_data", &SMCom<T>::handle_message_data)
+    .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
+    .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
+    .def("write_public", &SMCom<T>::write_public)
+    // #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+    // .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
+    // .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
+    // .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
+    // .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
+    // .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
+    // .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
+    // #endif
+    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(const T*, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+    .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue))
+    .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue))
+    .def("push_to_queue", &SMCom<T>::push_to_queue)
+    .def("finalize_queue", &SMCom<T>::finalize_queue)
+    .def("set_fixed_packet_size", &SMCom<T>::set_fixed_packet_size)
+    .def("GET_SMCOM_VERSION", &SMCom<T>::GET_SMCOM_VERSION)
+    .def("get_packet_data_length", &SMCom<T>::get_packet_data_length)
+    .def("duplicate_message_packet", &SMCom<T>::duplicate_message_packet) /// ARE VIRTUALS SHOULD BE DEFINED IN THIS ?
+    .def("listener", &SMCom<T>::listener)
+    .def("is_packet_broken", &SMCom<T>::is_packet_broken)
+    .def("is_crc_failed", &SMCom<T>::is_crc_failed)
+    #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+    .def("increase_ms_timer", &SMCom<T>::increase_ms_timer)
+    .def("run_request_scheduler", &SMCom<T>::run_request_scheduler)
+    #endif
+    .def("get_rx_buffer_size", &SMCom<T>::get_rx_buffer_size)
+    .def("assign_new_id", &SMCom<T>::assign_new_id)
+    .def_static("resolve_status", &SMCom<T>::resolve_status)
+    .def_readwrite("HEADER_SIZE", &SMCom<T>::HEADER_SIZE)
+    .def_readwrite("MAX_MSG_LENGTH", &SMCom<T>::MAX_MSG_LENGTH);
+}
 
 
 
@@ -145,6 +144,9 @@ PYBIND11_MODULE(SMCom, m) {
         .def_readwrite("write_queue", &public_node::write_queue)
         .def_readwrite("read_queue", &public_node::read_queue)
         .def_readwrite("name", &public_node::name);
-        // declareSMCom<SMCOM_PUBLIC>(m, "SMCOM_PUBLIC");
-        // declareSMCom<SMCOM_PRIVATE>(m, "SMCOM_PRIVATE");
+        declareSMCom<SMCOM_PUBLIC>(m, "SMCOM_PUBLIC");
+        declareSMCom<SMCOM_PRIVATE>(m, "SMCOM_PRIVATE");
+    
+    // m.def("public_rx_event_handler_callback", static_cast<void (*)(SMCom_event_types, SMCom_Status_t, const SMCOM_PUBLIC*)>(&public_rx_event_handler_callback));
+    // m.def("public_tx_event_handler_callback", static_cast<void (*)(SMCom_event_types, SMCom_Status_t, const SMCOM_PUBLIC*)>(&public_tx_event_handler_callback));
 }
