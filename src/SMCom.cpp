@@ -899,10 +899,6 @@ SMCom_Status_t SMCom<T>::common_respond_smcom_special_messages(T * packet){
 	return common_write(NULL,0);
 }
 
-template<typename T>
-SMCom_Status_t SMCom<T>::__write__(const uint8_t * buffer, uint16_t len){
-	return SMCOM_STATUS_FAIL;
-}
 
 template<typename T>
 SMCom_Status_t SMCom<T>::__read__(uint8_t * buffer, uint16_t len){

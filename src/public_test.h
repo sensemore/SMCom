@@ -8,6 +8,8 @@
 #include <string>
 
 void public_test();
+void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
+
 
 class public_node : public SMCom<SMCOM_PUBLIC>{
 public:

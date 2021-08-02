@@ -12,24 +12,25 @@ class PySMCOM : public SMCom<SMCOM_PUBLIC> {
 public:
     using Class = SMCom<SMCOM_PUBLIC>;
     using Class::SMCom;
+    // SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
     /* Trampoline (need one for each virtual function) */
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
-        PYBIND11_OVERRIDE(
-            SMCom_Status_t, /* Return type */
-            Class,      /* Parent class */
+        PYBIND11_OVERRIDE_PURE(
+            SMCom_Status_t,     /* Return type */
+            Class,              /* Parent class */
             __write__,          /* Name of function in C++ (must match Python name) */
             buffer,
-            len   /* Argument(s) */
+            len                 /* Argument(s) */
         );
     }
 
     SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
         PYBIND11_OVERRIDE(
-            SMCom_Status_t,   /* Return type */
-            Class,      /* Parent class */
-            __read__,          /* Name of function in C++ (must match Python name) */
+            SMCom_Status_t,
+            Class,      
+            __read__,          
             buffer,
-            len                 /* Argument(s) */
+            len           
         );
     }
 
@@ -40,19 +41,41 @@ public:
             __available__
         );
     }
+
+    void rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet) override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Class,
+            rx_event_handler_callback,
+            event,
+            status,
+            packet
+        );
+    }
+
+    void tx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet) override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Class,
+            tx_event_handler_callback,
+            event,
+            status,
+            packet
+        );
+    }
 };
 
 template<typename T>
 void declareSMCom(py::module &m, const std::string& typestr) {
     std::string pyclass_name = std::string("SMCom") + typestr;
     auto a = py::class_<SMCom<T>, PySMCOM>(m, pyclass_name.c_str())
-    .def("rx_event_handler_callback", &SMCom<T>::rx_event_handler_callback_ptr)
-    .def("tx_event_handler_callback", &SMCom<T>::tx_event_handler_callback_ptr)
     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	.def("request_response_callback", SMCom<T>::request_response_callback)
 	#endif
     .def("verify_message_header", &SMCom<T>::verify_message_header)
     .def("handle_message_data", &SMCom<T>::handle_message_data)
+    .def("rx_event_handler_callback", &SMCom<T>::rx_event_handler_callback)
+    .def("tx_event_handler_callback", &SMCom<T>::tx_event_handler_callback)
     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
     .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
     .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))

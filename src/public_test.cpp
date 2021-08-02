@@ -4,7 +4,8 @@
 public_node::public_node(uint16_t rx_buffer_size,
                          uint16_t tx_buffer_size, 
                          uint8_t id,
-                         std::string nodename) : SMCom(rx_buffer_size,tx_buffer_size, id)
+                         rx_event_handler_callback rx,
+                         std::string nodename) : SMCom(rx_buffer_size,tx_buffer_size, id, rx)
 {
     name = nodename;
     printf("Public node(%s) created, rx:%d,tx:%d | id:[%d]\n",name.c_str(),rx_buffer_size,tx_buffer_size,id);
@@ -131,7 +132,7 @@ static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Stat
     }
 }
 
-static void public_tx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+staticvoid public_tx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
     switch(packet->message_id){
         case public_messages::GREETINGS:{
             printf("Message 'GREETINGS' is sent from[%d] to [%d] | Status:%s\n",packet->transmitter_id,packet->receiver_id,SMCom<SMCOM_PUBLIC>::resolve_status(status));
@@ -156,8 +157,8 @@ static void public_tx_event_handler_callback(SMCom_event_types event, SMCom_Stat
 void public_test(){
     uint8_t idA = 10;
     uint8_t idB = 6;
-    public_node nodeA(1024,0,idA,"nodeA");
-    public_node nodeB(1024,0,idB,"nodeB");
+    public_node nodeA(1024,0,idA,public_rx_event_handler_callback,"nodeA");
+    public_node nodeB(1024,0,idB,public_tx_event_handler_callback,"nodeB");
 
     public_messages::msg_greetings greet_from_a = {0};
     strcpy(greet_from_a.message,"Hello my name is A");
