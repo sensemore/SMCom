@@ -4,9 +4,7 @@
 public_node::public_node(uint16_t rx_buffer_size,
                          uint16_t tx_buffer_size, 
                          uint8_t id,
-                         SMCom::rx_event_handler_callback rx, 
-                         SMCom::tx_event_handler_callback tx,
-                         std::string nodename) : SMCom(rx_buffer_size,tx_buffer_size, id,rx,tx)
+                         std::string nodename) : SMCom(rx_buffer_size,tx_buffer_size, id)
 {
     name = nodename;
     printf("Public node(%s) created, rx:%d,tx:%d | id:[%d]\n",name.c_str(),rx_buffer_size,tx_buffer_size,id);
@@ -78,35 +76,35 @@ void public_node::copy_txqueue_into_another_rxqueue(public_node &node){
 }
 
 
-namespace public_messages{
+// namespace public_messages{
 
-enum MESSAGES : uint8_t{
-    GREETINGS = 0,
-    PERSON,
-    EMPTY,
-};
-enum STATUS : uint8_t{
-	ERROR = 0,
-	SUCCESS,
-	NODEVICE,
-	TIMEOUT,
-	WAIT,
-	DATA,	
-	WRONG_MESSAGE,
-};
+// enum MESSAGES : uint8_t{
+//     GREETINGS = 0,
+//     PERSON,
+//     EMPTY,
+// };
+// enum STATUS : uint8_t{
+// 	ERROR = 0,
+// 	SUCCESS,
+// 	NODEVICE,
+// 	TIMEOUT,
+// 	WAIT,
+// 	DATA,	
+// 	WRONG_MESSAGE,
+// };
 
-typedef struct msg_greetings{
-	char message[30];
-}__attribute__((packed)) msg_greetins;
+// typedef struct msg_greetings{
+// 	char message[30];
+// }__attribute__((packed)) msg_greetins;
 
-typedef struct msg_person{
-	char name[20];
-    char surname[20];
-    uint8_t age;
-    char city[20];
-}__attribute__((packed)) msg_person;
+// typedef struct msg_person{
+// 	char name[20];
+//     char surname[20];
+//     uint8_t age;
+//     char city[20];
+// }__attribute__((packed)) msg_person;
 
-};
+// };
 
 
 static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
@@ -158,8 +156,8 @@ static void public_tx_event_handler_callback(SMCom_event_types event, SMCom_Stat
 void public_test(){
     uint8_t idA = 10;
     uint8_t idB = 6;
-    public_node nodeA(1024,0,idA,public_rx_event_handler_callback,public_tx_event_handler_callback,"nodeA");
-    public_node nodeB(1024,0,idB,public_rx_event_handler_callback,public_tx_event_handler_callback,"nodeB");
+    public_node nodeA(1024,0,idA,"nodeA");
+    public_node nodeB(1024,0,idB,"nodeB");
 
     public_messages::msg_greetings greet_from_a = {0};
     strcpy(greet_from_a.message,"Hello my name is A");

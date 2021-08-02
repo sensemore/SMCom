@@ -8,19 +8,15 @@ namespace py = pybind11;
 // compile code :
 // c++ -shared -fPIC $(python3 -m pybind11 --includes) config.cpp SMCom.cpp public_test.cpp -o SMCom$(python3-config --extension-suffix)
 
-
-// Important fix required to template class : wrapping void is not working at all
-
-class PyNode : public public_node {
+class PySMCOM : public SMCom<SMCOM_PUBLIC> {
 public:
-    /* Inherit the constructors */
-    using public_node::public_node;
-
+    using Class = SMCom<SMCOM_PUBLIC>;
+    using Class::SMCom;
     /* Trampoline (need one for each virtual function) */
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
         PYBIND11_OVERRIDE(
             SMCom_Status_t, /* Return type */
-            public_node,      /* Parent class */
+            Class,      /* Parent class */
             __write__,          /* Name of function in C++ (must match Python name) */
             buffer,
             len   /* Argument(s) */
@@ -30,7 +26,7 @@ public:
     SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
         PYBIND11_OVERRIDE(
             SMCom_Status_t,   /* Return type */
-            public_node,      /* Parent class */
+            Class,      /* Parent class */
             __read__,          /* Name of function in C++ (must match Python name) */
             buffer,
             len                 /* Argument(s) */
@@ -40,18 +36,8 @@ public:
     size_t __available__() override {
         PYBIND11_OVERRIDE(
             size_t,
-            public_node,
+            Class,
             __available__
-        );
-    }
-
-    void push_message_into_rx(const uint8_t * buffer, uint16_t len) {
-        PYBIND11_OVERRIDE(
-            void,
-            public_node,
-            push_message_into_rx,
-            buffer,
-            len
         );
     }
 };
@@ -59,34 +45,22 @@ public:
 template<typename T>
 void declareSMCom(py::module &m, const std::string& typestr) {
     std::string pyclass_name = std::string("SMCom") + typestr;
-    py::class_<SMCom<T>>(m, pyclass_name.c_str(), py::buffer_protocol(), py::dynamic_attr())
-    .def("rx_event_handler_callback", SMCom<T>::rx_event_handler_callback)
-    .def("tx_event_handler_callback", SMCom<T>::tx_event_handler_callback)
+    auto a = py::class_<SMCom<T>, PySMCOM>(m, pyclass_name.c_str())
+    .def("rx_event_handler_callback", &SMCom<T>::rx_event_handler_callback_ptr)
+    .def("tx_event_handler_callback", &SMCom<T>::tx_event_handler_callback_ptr)
     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	.def("request_response_callback", SMCom<T>::request_response_callback)
 	#endif
-    .def(py::init<uint16_t, uint16_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>()) //maybe SMCom<T>::rx_event_handler_callback not sure
-    .def(py::init<uint16_t, uint16_t, uint8_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
-    .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
-    .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t, SMCom<T>::rx_event_handler_callback, SMCom<T>::tx_event_handler_callback>())
     .def("verify_message_header", &SMCom<T>::verify_message_header)
     .def("handle_message_data", &SMCom<T>::handle_message_data)
-    .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
-    .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
-    .def("write_public", &SMCom<T>::write_public)
-    // #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-    // .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
-    // .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
-    // .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
-    // .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
-    // .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
-    // .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
-    // #endif
-    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
-    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
-    .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(const T*, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
-    .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue))
-    .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue))
+    #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+    .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
+    .def("request", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::request))
+    .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
+    .def("ping", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::ping))
+    .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
+    .def("get_version", static_cast<SMCom_Status_t (SMCom<T>::*)(uint32_t, SMCom<T>::request_response_callback)>(&SMCom<T>::get_version))
+    #endif
     .def("push_to_queue", &SMCom<T>::push_to_queue)
     .def("finalize_queue", &SMCom<T>::finalize_queue)
     .def("set_fixed_packet_size", &SMCom<T>::set_fixed_packet_size)
@@ -101,10 +75,29 @@ void declareSMCom(py::module &m, const std::string& typestr) {
     .def("run_request_scheduler", &SMCom<T>::run_request_scheduler)
     #endif
     .def("get_rx_buffer_size", &SMCom<T>::get_rx_buffer_size)
-    .def("assign_new_id", &SMCom<T>::assign_new_id)
+    .def("__write__", &SMCom<T>::__write__)
     .def_static("resolve_status", &SMCom<T>::resolve_status)
-    .def_readwrite("HEADER_SIZE", &SMCom<T>::HEADER_SIZE)
-    .def_readwrite("MAX_MSG_LENGTH", &SMCom<T>::MAX_MSG_LENGTH);
+    .def_property_readonly_static("HEADER_SIZE", [](py::object) { return SMCom<T>::HEADER_SIZE;})
+    .def_property_readonly_static("MAX_MSG_LENGTH", [](py::object) { return SMCom<T>::MAX_MSG_LENGTH;});
+
+    if(typeid(T) == typeid(SMCOM_PUBLIC)){
+        a.def(py::init<uint16_t, uint16_t, uint8_t>())
+        .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t>())
+        .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
+        .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(const T*, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+        .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue))
+        .def("write_public", &SMCom<T>::write_public)
+        .def("assign_new_id", &SMCom<T>::assign_new_id);
+    }
+
+    // if(typeid(T) == typeid(SMCOM_PRIVATE)){
+    //     a.def(py::init<uint16_t, uint16_t>())
+    //     .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t>())
+    //     .def("write", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::write))
+    //     .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(uint8_t, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+    //     .def("respond", static_cast<SMCom_Status_t (SMCom<T>::*)(const T*, const uint8_t*, uint8_t)>(&SMCom<T>::respond))
+    //     .def("start_write_queue", static_cast<SMCom_Status_t (SMCom<T>::*)(SMCom_message_types, uint8_t, uint8_t)>(&SMCom<T>::start_write_queue));
+    // }
 }
 
 
@@ -132,21 +125,18 @@ PYBIND11_MODULE(SMCom, m) {
         .value("SM_INDICATE_EVENT", SMCom_event_types::SM_INDICATE_EVENT)
         .export_values();
 
-    py::class_<public_node, PyNode>(m, "public_node")
-        .def(py::init<uint16_t, uint16_t, uint8_t, public_node::rx_event_handler_callback, public_node::tx_event_handler_callback, std::string>())
-        .def("__read__", &public_node::__read__)
-        .def("__write__", &public_node::__write__)
-        .def("available", &public_node::__available__)
-        .def("push_message_into_rx", &public_node::push_message_into_rx)
-        .def("copy_txqueue_into_another_rxqueue", &public_node::copy_txqueue_into_another_rxqueue)
-        .def("print_rx", &public_node::print_rx)
-        .def("print_tx", &public_node::print_tx)
-        .def_readwrite("write_queue", &public_node::write_queue)
-        .def_readwrite("read_queue", &public_node::read_queue)
-        .def_readwrite("name", &public_node::name);
+    // py::class_<public_node>(m, "public_node")
+    //     .def(py::init<uint16_t, uint16_t, uint8_t, std::string>())
+    //     .def("__read__", &public_node::__read__)
+    //     .def("__write__", &public_node::__write__)
+    //     .def("available", &public_node::__available__)
+    //     .def("push_message_into_rx", &public_node::push_message_into_rx)
+    //     .def("copy_txqueue_into_another_rxqueue", &public_node::copy_txqueue_into_another_rxqueue)
+    //     .def("print_rx", &public_node::print_rx)
+    //     .def("print_tx", &public_node::print_tx)
+    //     .def_readwrite("write_queue", &public_node::write_queue)
+    //     .def_readwrite("read_queue", &public_node::read_queue)
+    //     .def_readwrite("name", &public_node::name);
         declareSMCom<SMCOM_PUBLIC>(m, "SMCOM_PUBLIC");
-        declareSMCom<SMCOM_PRIVATE>(m, "SMCOM_PRIVATE");
-    
-    // m.def("public_rx_event_handler_callback", static_cast<void (*)(SMCom_event_types, SMCom_Status_t, const SMCOM_PUBLIC*)>(&public_rx_event_handler_callback));
-    // m.def("public_tx_event_handler_callback", static_cast<void (*)(SMCom_event_types, SMCom_Status_t, const SMCOM_PUBLIC*)>(&public_tx_event_handler_callback));
+        // declareSMCom<SMCOM_PRIVATE>(m, "SMCOM_PRIVATE");
 }

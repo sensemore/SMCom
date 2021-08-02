@@ -11,7 +11,7 @@ void public_test();
 
 class public_node : public SMCom<SMCOM_PUBLIC>{
 public:
-    public_node(uint16_t rx_buffer_size, uint16_t tx_buffer_size, uint8_t id, SMCom::rx_event_handler_callback rx, SMCom::tx_event_handler_callback tx, std::string name);
+    public_node(uint16_t rx_buffer_size, uint16_t tx_buffer_size, uint8_t id, std::string name);
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
 	SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 	size_t __available__();

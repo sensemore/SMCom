@@ -5,9 +5,10 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
-#define SMCOM_CONFIG_REQUEST_RESPONSE
+// #define SMCOM_CONFIG_REQUEST_RESPONSE
 #endif
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
@@ -187,7 +188,35 @@ enum SMCom_special_messages : uint8_t{
 	SMCOM_MSG_PING__ = 62,
 	SMCOM_MSG_GET_VERSION__ = 63,
 };
+namespace public_messages{
 
+enum MESSAGES : uint8_t{
+    GREETINGS = 0,
+    PERSON,
+    EMPTY,
+};
+enum STATUS : uint8_t{
+	ERROR = 0,
+	SUCCESS,
+	NODEVICE,
+	TIMEOUT,
+	WAIT,
+	DATA,	
+	WRONG_MESSAGE,
+};
+
+typedef struct msg_greetings{
+	char message[30];
+}__attribute__((packed)) msg_greetins;
+
+typedef struct msg_person{
+	char name[20];
+    char surname[20];
+    uint8_t age;
+    char city[20];
+}__attribute__((packed)) msg_person;
+
+};
 
 typedef struct smcom_message_get_version_struct__{
 	uint32_t version;
@@ -198,22 +227,71 @@ typedef struct smcom_message_get_version_struct__{
 template <typename CT>
 class SMCom{
 public:
-	typedef void (*rx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
-	rx_event_handler_callback rx_event_handler_callback_ptr = NULL;
+	// typedef void (*rx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
+	// rx_event_handler_callback rx_event_handler_callback_ptr = NULL;
 
-	typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
-	tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
+	// typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
+	// tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
+	void tx_event_handler_callback_ptr(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+		// printf("Packet length %d\n",packet->data_len);
+		switch(packet->message_id){
+			case public_messages::GREETINGS:{
+				// printf("Message GREETINGS invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+				std::string msg((char*)packet->data);
+				// printf("Message length[%d]:%s\n",packet->data_len,msg.c_str());
+				break;
+			}
+			case public_messages::PERSON:{
+				// printf("Message PERSON invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+				break;
+			}
+			case public_messages::EMPTY:{
+				// printf("Message EMPTY invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+
+				break;
+			}
+			default:{
+				// assert(0);
+				;
+			}
+		}
+	}
+
+	void rx_event_handler_callback_ptr(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+		// printf("Packet length %d\n",packet->data_len);
+		switch(packet->message_id){
+			case public_messages::GREETINGS:{
+				// printf("Message GREETINGS invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+				std::string msg((char*)packet->data);
+				printf("Message length[%d]:%s\n",packet->data_len,msg.c_str());
+				break;
+			}
+			case public_messages::PERSON:{
+				printf("Message PERSON invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+				break;
+			}
+			case public_messages::EMPTY:{
+				printf("Message EMPTY invoked! Transmitter id[%d], Receiver id[%d]\n",packet->transmitter_id,packet->receiver_id);
+
+				break;
+			}
+			default:{
+				// assert(0);
+				;
+			}
+		}
+	}
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
 	#endif
 	
 	////Constructors with dynamic buffers, uses C++ new allocater
-	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size);
+	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id);
 	//Constructors with static buffers
-	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
-	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size);
+	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id);
 	~SMCom();
 
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
@@ -238,7 +316,6 @@ public:
 	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len);
 	
-
 
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len);
