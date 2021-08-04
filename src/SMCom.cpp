@@ -10,9 +10,8 @@
 // |    1     |     1     |   1   |          | 2  |    1    |
 // +----------+-----------+-------+----------+----+---------+
 
-
 template<>
-SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size){
+SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
 
 	rx_buffer = new uint8_t[rx_buf_size];
 	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
@@ -20,20 +19,20 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size){
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
 
-	// rx_event_handler_callback_ptr = rx;
-	// tx_event_handler_callback_ptr = tx;
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
 }
 
 template<>
-SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size){
+SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	this->rx_buffer = rx_buffer;
 	this->tx_buffer = tx_buffer;
 
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
 
-	// rx_event_handler_callback_ptr = rx;
-	// tx_event_handler_callback_ptr = tx;
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
 
 	conflag.static_buffer_provided = true;
 }
@@ -156,30 +155,30 @@ SMCom<SMCOM_PRIVATE>::~SMCom(){
 // +----------+-----------+--------+-----------+-------+----------+----+---------+
 
 template<>
-SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id){
+SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	rx_buffer = new uint8_t[rx_buf_size];
 	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
 
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
 
-	// rx_event_handler_callback_ptr = rx;
-	// tx_event_handler_callback_ptr = tx;
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
 }
 
 template<>
-SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id){
+SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
 	this->rx_buffer = rx_buffer;
 	this->tx_buffer = tx_buffer;
 
 	this->rx_buf_size = rx_buf_size;
 	this->tx_buf_size = tx_buf_size;
 
-	// rx_event_handler_callback_ptr = rx;
-	// tx_event_handler_callback_ptr = tx;
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
@@ -600,9 +599,9 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 	txflag.crc_flag = 1;
 
 
-	// if(tx_event_handler_callback_ptr != NULL){
-	// 	tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
-	// }
+	if(tx_event_handler_callback_ptr != NULL){
+		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	}
 
 	clear_tx_flag();
 
@@ -749,8 +748,8 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 		ret = common_write_polling(buffer,len);
 	}
 	//if it is a request we won't call general tx handler because each request has its own callback function
-	// if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
-	// 	tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
+		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 
 	return ret;
 }
@@ -877,9 +876,9 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 		packet = NULL;
 	}
 
-	// if(packet != NULL && rx_event_handler_callback_ptr != NULL){
-	// 	rx_event_handler_callback_ptr(evt,ret,packet);
-	// }
+	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
+		rx_event_handler_callback_ptr(evt,ret,packet);
+	}
 
 	clear_rx_flag();
 	return ret;
