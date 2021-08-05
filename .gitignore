@@ -2,5 +2,5 @@
 src/SMCom.cpython-38-x86_64-linux-gnu.so
 wrapping.code-workspace
 src/SMCom.h.gch
-.so
-.out
+*.so
+*.out
