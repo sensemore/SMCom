@@ -27,37 +27,64 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     public:
     py_smcom_tramp(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : SMCom::SMCom(rx_buf_size, tx_buf_size, id, NULL, NULL){;}
     virtual void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet) = 0;
-};
+    virtual void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet) = 0;
+    virtual SMCom_Status_t __write__(std::vector<uint8_t> buffer, uint16_t len) = 0;
+    virtual SMCom_Status_t __read__(std::vector<uint8_t> buffer, uint16_t len) = 0;
 
-void py_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
-
-class PySMCOM : py_smcom_tramp {
-public:
-    using tramp = py_smcom_tramp;
-    PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(0, 0, 0)
-    {
-        this->rx_event_handler_callback_ptr = (void (*)(SMCom_event_types, SMCom_Status_t, const SMCOM_PUBLIC*)) &PySMCOM::py_rx_event_handler_callback;
+    SMCom_Status_t write(uint8_t receiver_id,uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
+        uint8_t new_buffer[len];
+        std::copy(buffer.begin(), buffer.end(), new_buffer);
+        return SMCom<SMCOM_PUBLIC>::write(receiver_id, message_id, new_buffer, len);
     }
 
-    static PySMCOM create(void){
-        return PySMCOM(0,0,0);
+    SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
+        uint8_t new_buffer[len];
+        std::copy(buffer.begin(), buffer.end(), new_buffer);
+        return SMCom<SMCOM_PUBLIC>::respond(receiver_id, message_id, new_buffer, len);
     }
 
-    // void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet);
-    void py_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
+    SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
+        std::vector<uint8_t> new_buffer;
+        new_buffer = std::vector<uint8_t> (buffer, buffer + len);
+        return __write__(new_buffer, len);
+    }
+
+    SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
+        std::vector<uint8_t> new_buffer;
+        new_buffer = std::vector<uint8_t> (buffer, buffer + len);
+        return __read__(new_buffer, len);
+    }
+
+    void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
         pySMCOM_PUBLIC pypacket;
-        pypacket.data = std::vector<uint8_t>(packet->data, packet->data + sizeof(packet->data) / sizeof(int));
+        pypacket.data = std::vector<uint8_t>(packet->data, packet->data + packet->data_len);
         pypacket.data_len = packet->data_len;
         pypacket.message_id = packet->message_id;
         pypacket.message_type = packet->message_type;
         pypacket.receiver_id = packet->receiver_id;
         pypacket.transmitter_id = packet->transmitter_id;
-        return __rx_callback__(event, status, pypacket);
+        __rx_callback__(event, status, pypacket);
     }
 
-    // SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
+    void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
+        pySMCOM_PUBLIC pypacket;
+        pypacket.data = std::vector<uint8_t>(packet->data, packet->data + packet->data_len);
+        pypacket.data_len = packet->data_len;
+        pypacket.message_id = packet->message_id;
+        pypacket.message_type = packet->message_type;
+        pypacket.receiver_id = packet->receiver_id;
+        pypacket.transmitter_id = packet->transmitter_id;
+        __tx_callback__(event, status, pypacket);
+    }
+};
+
+class PySMCOM : public py_smcom_tramp {
+public:
+    using tramp = py_smcom_tramp;
+    PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(rx_buf_size, tx_buf_size, id){;}
+
     /* Trampoline (need one for each virtual function) */
-    SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
+    SMCom_Status_t __write__(std::vector<uint8_t> buffer, uint16_t len) override {
         PYBIND11_OVERRIDE_PURE(
             SMCom_Status_t,     /* Return type */
             tramp,              /* Parent class */
@@ -67,8 +94,8 @@ public:
         );
     }
 
-    SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
-        PYBIND11_OVERRIDE(
+    SMCom_Status_t __read__(std::vector<uint8_t> buffer, uint16_t len) override {
+        PYBIND11_OVERRIDE_PURE(
             SMCom_Status_t,
             tramp,      
             __read__,          
@@ -85,21 +112,32 @@ public:
         );
     }
 
-    void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet){
+    void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC pypacket){
         PYBIND11_OVERRIDE_PURE(
             void,
             tramp,
             __rx_callback__,
             event,
             status,
-            packet
+            pypacket
+        );
+    }
+
+    void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC pypacket){
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            tramp,
+            __tx_callback__,
+            event,
+            status,
+            pypacket
         );
     }
 };
 
 template<typename T>
 void declareSMCom(py::module &m, const std::string& typestr) {
-    std::string pyclass_name = "SMCom";
+    std::string pyclass_name = typestr;
     using Class = py_smcom_tramp;
     auto a = py::class_<Class, PySMCOM>(m, pyclass_name.c_str())
     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
@@ -107,10 +145,8 @@ void declareSMCom(py::module &m, const std::string& typestr) {
 	#endif
     .def("verify_message_header", &Class::verify_message_header)
     .def("handle_message_data", &Class::handle_message_data)
-    // // .def("__rx_callback__", &PySMCOM::__rx_callback__)
-    // // .def("rx_event_handler_callback", &Class::rx_event_handler_callback)
-    // // .def("tx_event_handler_callback", &Class::tx_event_handler_callback)
-    // // .def("py_rx_callback", &Class::py_rx_callback)
+    .def("__rx_callback__", static_cast<void (Class::*)(SMCom_event_types, SMCom_Status_t, pySMCOM_PUBLIC)>(&Class::__rx_callback__))
+    .def("__tx_callback__", static_cast<void (Class::*)(SMCom_event_types, SMCom_Status_t, pySMCOM_PUBLIC)>(&Class::__tx_callback__))
     #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
     .def("request", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t, uint32_t, Class::request_response_callback)>(&Class::request))
@@ -133,8 +169,8 @@ void declareSMCom(py::module &m, const std::string& typestr) {
     .def("run_request_scheduler", &Class::run_request_scheduler)
     #endif
     .def("get_rx_buffer_size", &Class::get_rx_buffer_size)
-    .def("__write__", &Class::__write__)
-    .def("__read__", &Class::__read__)
+    .def("__write__", static_cast<SMCom_Status_t (Class::*)(std::vector<uint8_t>, uint16_t)>(&Class::__write__))
+    .def("__read__", static_cast<SMCom_Status_t (Class::*)(std::vector<uint8_t>, uint16_t)>(&Class::__read__))
     .def("__available__", &Class::__available__)
     .def("listener", &Class::listener)
     .def_static("resolve_status", &Class::resolve_status)
@@ -144,8 +180,8 @@ void declareSMCom(py::module &m, const std::string& typestr) {
     if(typeid(T) == typeid(SMCOM_PUBLIC)){
         a.def(py::init<uint16_t, uint16_t, uint8_t>())
         // .def(py::init<uint8_t*, uint16_t, uint8_t*, uint16_t, uint8_t, typename Class::rx_event_handler_callback, typename Class::tx_event_handler_callback>())
-        .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, const uint8_t*, uint8_t)>(&Class::write))
-        .def("respond", static_cast<SMCom_Status_t (Class::*)(const T*, const uint8_t*, uint8_t)>(&Class::respond))
+        .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write))
+        .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::respond))
         .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&Class::start_write_queue))
         .def("write_public", &Class::write_public)
         .def("assign_new_id", &Class::assign_new_id);

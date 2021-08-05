@@ -200,7 +200,8 @@ class SMCom{
 public:
 	typedef void (*rx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	rx_event_handler_callback rx_event_handler_callback_ptr = NULL;
-
+	virtual void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet) = 0;
+	virtual void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet) = 0;
 	typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
 

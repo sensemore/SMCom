@@ -602,6 +602,9 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 	if(tx_event_handler_callback_ptr != NULL){
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 	}
+	else{
+		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	}
 
 	clear_tx_flag();
 
@@ -748,6 +751,9 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 		ret = common_write_polling(buffer,len);
 	}
 	//if it is a request we won't call general tx handler because each request has its own callback function
+	if(tx_event_handler_callback_ptr == NULL){
+		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	}
 	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 
@@ -875,7 +881,9 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 		}
 		packet = NULL;
 	}
-
+	if(rx_event_handler_callback_ptr == NULL){
+		__rx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	}
 	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
 		rx_event_handler_callback_ptr(evt,ret,packet);
 	}
