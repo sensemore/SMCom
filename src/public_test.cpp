@@ -11,13 +11,6 @@ public_node::public_node(uint16_t rx_buffer_size,
     name = nodename;
     printf("Public node(%s) created, rx:%d,tx:%d | id:[%d]\n",name.c_str(),rx_buffer_size,tx_buffer_size,id);
 }
-void public_node::__rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
-    return;
-}
-
-void public_node::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
-    return;
-}
 
 SMCom_Status_t public_node::__write__(const uint8_t * buffer, uint16_t len){
     

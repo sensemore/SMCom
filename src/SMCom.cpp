@@ -618,7 +618,7 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
-
+	memcpy(com_packet.data, buffer, len);
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
 
