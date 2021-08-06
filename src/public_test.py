@@ -59,20 +59,26 @@ class public_node(SMCOM_PUBLIC):
         while(len(self.write_queue) == 0):
             node.read_queue.append(self.write_queue[0])
             self.write_queue.pop(0)
-    
+
+
+
 idA = 10
-idB = 6
+# idB = 6
 nodeA = public_node(1024, 1024, idA, "NodeA")
-nodeB = public_node(1024, 1024, idB, "NodeB")
-x = [0,2,2,3,5]
+nodeA.write_public(10, [0,1,2,3], 4)
+# nodeB = public_node(1024, 1024, idB, "NodeB")
+# x = [0,2,2,3,5]
+# s = pySMCOM_PUBLIC()
+# temp = nodeA.write(idA, 0, x, 5)
 
-temp = nodeA.write(idA, 0, x, 5)
-nodeA.print_rx()
-nodeA.copy_txqueue_into_another_rxqueue(nodeB)
-nodeB.print_tx()
+# duplicate_message_packet()
 
-listener_ret = nodeB.listener()
-print("Listener Returned : ", nodeB.resolve_status(listener_ret))
+# nodeA.print_rx()
+# nodeA.copy_txqueue_into_another_rxqueue(nodeB)
+# nodeB.print_tx()
 
-print("="*40)
+# listener_ret = nodeB.listener()
+# print("Listener Returned : ", nodeB.resolve_status(listener_ret))
+
+# print("="*40)
 
