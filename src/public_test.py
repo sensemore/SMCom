@@ -1,6 +1,6 @@
-from SMCom import *
+import SMCom
 
-class public_node(SMCOM_PUBLIC):
+class public_node(SMCom.SMCOM_PUBLIC):
     def __init__(self, rx_buffer_size, tx_buffer_size, id, nodename, rx = None):
         super().__init__(rx_buffer_size, tx_buffer_size, id)
         print(f"{nodename} is created rx:{rx_buffer_size} tx:{tx_buffer_size} id:{id}")
@@ -10,24 +10,24 @@ class public_node(SMCOM_PUBLIC):
     
     def __write__(self, buffer, length):
         if buffer == None:
-            return SMCOM_STATUS_FAIL
+            return SMCom.SMCOM_STATUS_FAIL
         for i in range(length):
             self.write_queue.append(buffer[i])
         print("__write__: " + str(buffer))
-        return SMCOM_STATUS_SUCCESS
+        return SMCom.SMCOM_STATUS_SUCCESS
     
     def push_message_into_rx(self, buffer, length):
         for i in range(length):
             self.read_queue.push(buffer[i])
-        return SMCOM_STATUS_SUCCESS
+        return SMCom.SMCOM_STATUS_SUCCESS
 
     def __read__(self, buffer, length):
         if length > len(self.read_queue):
-            return SMCOM_STATUS_FAIL
+            return SMCom.SMCOM_STATUS_FAIL
         for i in range(length):
             buffer[i] = self.read_queue[0]
             self.req_queue.pop(0)
-        return SMCOM_STATUS_SUCCESS
+        return SMCom.SMCOM_STATUS_SUCCESS
     
     def __available__(self):
         return len(self.read_queue)
@@ -59,7 +59,6 @@ class public_node(SMCOM_PUBLIC):
         while(len(self.write_queue) == 0):
             node.read_queue.append(self.write_queue[0])
             self.write_queue.pop(0)
-
 
 
 idA = 10

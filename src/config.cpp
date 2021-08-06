@@ -15,11 +15,11 @@ namespace py = pybind11;
 
 class pySMCOM_PUBLIC{
     public:
-    uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
-    uint8_t receiver_id;		//<! Receiver id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0b0000xxxx
-    uint8_t transmitter_id;	//<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
-    uint8_t message_type;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
-    uint8_t message_id;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
+    uint8_t data_len;			        //<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
+    uint8_t receiver_id;		        //<! Receiver id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0b0000xxxx
+    uint8_t transmitter_id;	            //<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
+    uint8_t message_type;		        //<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
+    uint8_t message_id;		            //<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
     std::vector<uint8_t> data;			//<! Data pointer for derived classes
 };
 
@@ -215,13 +215,20 @@ void declareSMCom(py::module &m, const std::string& typestr) {
     .def_property_readonly_static("MAX_MSG_LENGTH", [](py::object) { return Class::MAX_MSG_LENGTH;});
 
     if(typeid(T) == typeid(SMCOM_PUBLIC)){
-        a.def(py::init<uint16_t, uint16_t, uint8_t>())
-        .def(py::init<std::vector<uint8_t>, uint16_t, std::vector<uint8_t>, uint16_t, uint8_t>())
-        .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write))
-        .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::respond))
-        .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&Class::start_write_queue))
-        .def("write_public", static_cast<SMCom_Status_t (Class::*)(uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write_public))
-        .def("assign_new_id", &Class::assign_new_id);
+        a.def(py::init<uint16_t, uint16_t, uint8_t>(),
+                                        "(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) -> SMCOM_PUBLIC")
+        .def(py::init<std::vector<uint8_t>, uint16_t, std::vector<uint8_t>, uint16_t, uint8_t>(), 
+                                        "(std::vector<uint8_t> rx_buffer, uint16_t rx_buf_size, std::vector<uint8_t> tx_buffer, uint16_t tx_buf_size, uint8_t id) -> SMCOM_PUBLIC")
+        .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write), 
+                                        "(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
+        .def("respond", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::respond),
+                                        "(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
+        .def("start_write_queue", static_cast<SMCom_Status_t (Class::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&Class::start_write_queue),
+                                        "(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len) -> SMCom_Status_T")
+        .def("write_public", static_cast<SMCom_Status_t (Class::*)(uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write_public),
+                                        "(uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
+        .def("assign_new_id", &Class::assign_new_id,
+                                        "(uint8_t id) -> void");
     }
 }
 
