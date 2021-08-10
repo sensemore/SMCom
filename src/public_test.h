@@ -15,8 +15,8 @@ public:
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
 	SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 	size_t __available__();
-    void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
-    void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
+    //void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
+    //void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet);
 
     void push_message_into_rx(const uint8_t * buffer, uint16_t len);
     void copy_txqueue_into_another_rxqueue(public_node &node);

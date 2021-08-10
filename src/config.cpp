@@ -255,6 +255,15 @@ PYBIND11_MODULE(SMCom, m) {
         .value("SM_INDICATE_EVENT", SMCom_event_types::SM_INDICATE_EVENT)
         .export_values();
 
+    py::enum_<SMCom_headers>(m, "SMCom_headers")
+        .value("MESSAGE_START", SMCom_headers::MESSAGE_START)
+        .value("MESSAGE_END", SMCom_headers::MESSAGE_END)
+        .value("PUBLIC_ID_8BIT", SMCom_headers::PUBLIC_ID_8BIT)
+        .value("DEFAULT_ID_8BIT", SMCom_headers::DEFAULT_ID_8BIT)
+        .value("PUBLIC_ID_4BIT", SMCom_headers::PUBLIC_ID_4BIT)
+        .value("DEFAULT_ID_4BIT", SMCom_headers::DEFAULT_ID_4BIT)
+        .export_values();
+
     py::class_<pySMCOM_PUBLIC>(m, "pySMCOM_PUBLIC")
         .def(py::init<>())
         .def_readwrite("data_len", &pySMCOM_PUBLIC::data_len)

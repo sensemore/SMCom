@@ -918,6 +918,16 @@ size_t SMCom<T>::__available__(){
 }
 
 template<typename T>
+void SMCom<T>::__rx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
+	return;
+}
+
+template<typename T>
+void SMCom<T>::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
+	return;
+}
+
+template<typename T>
 SMCom_Status_t SMCom<T>::listener(void){
 	uint16_t len = HEADER_SIZE;
 	

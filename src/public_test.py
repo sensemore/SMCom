@@ -65,6 +65,7 @@ idA = 10
 # idB = 6
 nodeA = public_node(1024, 1024, idA, "NodeA")
 nodeA.write_public(10, [0,1,2,3], 4)
+# print(public_node.mro())
 # nodeB = public_node(1024, 1024, idB, "NodeB")
 # x = [0,2,2,3,5]
 # s = pySMCOM_PUBLIC()
