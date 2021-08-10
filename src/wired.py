@@ -1,10 +1,12 @@
 import SMCom
 import serial
+import threading
 
 BAUD_RATE = 115200
 ser = serial.Serial('/dev/ttyUSB0', BAUD_RATE)
 
-two_bytes = lambda byte1, byte2 : (byte1 | (byte2 << 8))
+from_two_bytes = lambda byte1, byte2 : (byte1 | (byte2 << 8))
+to_two_bytes = lambda int1 : ((int1 & 0xFF), ((int1 >> 8) & 0xFF))
 
 class Wired(SMCom.SMCOM_PUBLIC):
     def __init__(self, rx_buffer_size, tx_buffer_size, device_id):
@@ -35,28 +37,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
         print("id : " + str(packet.message_id))
         print("data : " + str(packet.data))
     
-    def __available__(self, buffer, length):
-        buffer.clear()
-        temp = []
-
-        i = 0
-        while i < 1:
-            self.__read__(temp, length)
-            if temp != []:
-                buffer.extend(temp)
-                temp = []
-                i += 1
-        return SMCom.SMCOM_STATUS_SUCCESS
-
+    def __available__(self):
+        return ser.inWaiting()
 
     def __read__(self, buffer, length):
-        readFlag = True
         buffer.clear()
-        while readFlag:
-            x = ser.read(length + 7) 
-            buffer.extend(x)
-            if len(x) != 0:
-                readFlag = False
+        temp = ser.read(length) 
+        buffer.extend(temp)
         return SMCom.SMCOM_STATUS_SUCCESS
 
     def get_version(self):
@@ -78,9 +65,11 @@ class Wired(SMCom.SMCOM_PUBLIC):
         mac_adress = ":".join(mac_adress)
         return mac_adress
     
-    def auto_addressing_init(self):
+    def auto_addressing_init(self, buffer):  ## len(buffer) = 3 but len(data) = 5
         data = []
-
+        data[0] = buffer[0]
+        data[1], data[2] = to_two_bytes(buffer[1])
+        data[3], data[4] = to_two_bytes(buffer[2])
         self.write_public(11, data, len(data))
 
     MESSAGES_SENSEWAY_WIRED = \
