@@ -1,9 +1,10 @@
 import SMCom
 import serial
 import threading
-import time
+import collections
 
 BAUD_RATE = 115200
+
 # from_two_bytes = lambda byte1, byte2 : (byte1 | (byte2 << 8))
 # to_two_bytes = lambda int1 : ((int1 & 0xFF), ((int1 >> 8) & 0xFF))
 
@@ -11,7 +12,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
     def __init__(self, rx_buffer_size, tx_buffer_size, device_id):
         super().__init__(rx_buffer_size, tx_buffer_size, device_id)
         self.ser = serial.Serial('/dev/ttyUSB0', BAUD_RATE)
-        self.compacket = SMCom.pySMCOM_PUBLIC() 
+        self.waitingQueue = collections.deque()
 
     def __write__(self, buffer, length):
         if buffer == None or buffer == [] or buffer == "" or buffer == b'':
@@ -29,34 +30,26 @@ class Wired(SMCom.SMCOM_PUBLIC):
         return SMCom.SMCOM_STATUS_SUCCESS
 
     def __rx_callback__(self, event, status, packet):
-        print("rx callback here")
-        self.compacket.data = packet.data
-        self.compacket.data_len = packet.data_len
+        pass
 
     def __tx_callback__(self, event, status, packet):
         pass
     
     def __available__(self):
-        if self.ser.inWaiting() > 0:
-            print(self.ser.inWaiting())
         return self.ser.inWaiting()
 
-    def __read__(self, length):
-        buffer = []
-        pair = SMCom.SMCom_Pair()
-        temp = self.ser.read(length)
-        for i in temp:
-            buffer.append(i)
-        print("buffer: ", buffer)
-        pair.vec = buffer
-        print("pair.vec: ", pair.vec)##    
-        pair.status = SMCom.SMCOM_STATUS_SUCCESS
-        return pair
+    def __read__(self, buffer, length):
+        buffer.clear()
+        temp = self.ser.read(length+7) 
+        buffer.extend(temp)
+        return SMCom.SMCOM_STATUS_SUCCESS
 
     def get_version(self, id):
-        # self.write(id, 10, [], 0)
-        SMCom_version = self.compacket.data
-        # SMCom_version = f"{SMCom_version[6]}.{SMCom_version[5]}.{SMCom_version[4]}"
+        self.write(id, 10, [], 0)
+        SMCom_version = []
+        self.__read__(SMCom_version, 3)
+        print(SMCom_version)
+        SMCom_version = f"{SMCom_version[6]}.{SMCom_version[5]}.{SMCom_version[4]}"
         return SMCom_version
     
     def get_mac_adress(self, id):
@@ -71,13 +64,12 @@ class Wired(SMCom.SMCOM_PUBLIC):
         mac_adress = ":".join(mac_adress)
         return mac_adress
     
-    def thread_func(self):
-        while True:
-            #print("sjjsjsjs")
-            if(self.ser.inWaiting()):
-                print(self.ser.inWaiting())
-            self.listener()
-            #time.sleep(0.1)
+    # def auto_addressing_init(self, buffer):  ## len(buffer) = 3 but len(data) = 5
+    #     data = []
+    #     data[0] = buffer[0]
+    #     data[1], data[2] = to_two_bytes(buffer[1])
+    #     data[3], data[4] = to_two_bytes(buffer[2])
+    #     self.write_public(11, data, len(data))
 
     MESSAGES_SENSEWAY_WIRED = \
     [
@@ -104,13 +96,8 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.ser.close()
 
 nodeA = Wired(1024, 1024, 13)
-t = threading.Thread(target=nodeA.thread_func, daemon=True)
-t.start()
 
-time.sleep(2)
-nodeA.write(255, 10, [], 0)
-time.sleep(2)
-#temp = nodeA.get_version(255)
-#print("x: ", temp)
-t.join()
+temp = nodeA.get_mac_adress(255)
+print(temp)
+
 print("...")

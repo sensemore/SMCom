@@ -937,6 +937,7 @@ SMCom_Status_t SMCom<T>::listener(void){
 	if(avlb >= HEADER_SIZE){
 		uint8_t * ptr = rx_buffer;
 		while(__available__() > 0 && __read__(ptr,1) == SMCOM_STATUS_SUCCESS){
+			printf("%u\n", *ptr);
 			if(*ptr == MESSAGE_START){
 				++ptr;
 				break;
@@ -956,6 +957,7 @@ SMCom_Status_t SMCom<T>::listener(void){
 		else{
 			clear_rx_flag();
 		}
+		printf("here3");
 	}
 	return status;
 }
