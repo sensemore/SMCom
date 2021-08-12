@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <cstring>
 
-
 // #ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
 // #define SMCOM_CONFIG_REQUEST_RESPONSE
 // #endif
@@ -308,6 +307,11 @@ protected:
 	void clear_rx_flag();
 
 private:
+
+	//############### For bug fix!
+	uint8_t * bugfix_rx_buffer = NULL;
+	uint8_t * bugfix_tx_buffer = NULL;
+	//###############
 
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);

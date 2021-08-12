@@ -169,8 +169,10 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 	com_packet.transmitter_id = id;
 }
 
+
 template<>
 SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
+		
 	this->rx_buffer = rx_buffer;
 	this->tx_buffer = tx_buffer;
 
@@ -182,6 +184,9 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
+
+	this->bugfix_rx_buffer = rx_buffer;
+	this->bugfix_tx_buffer = tx_buffer;
 
 	conflag.static_buffer_provided = true;
 }
@@ -617,6 +622,8 @@ template<typename T>
 SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len){
 	//before calling this function check that txbuffer is not null
 
+	this->tx_buffer = bugfix_tx_buffer; //XXXXXXXXX for bug fix
+
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
 	memcpy(com_packet.data, buffer, len);
@@ -882,7 +889,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	}
 	memcpy(com_packet.data, raw_bytes, len);
 	if(rx_event_handler_callback_ptr == NULL){
-		__rx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+		__rx_callback__((SMCom_event_types)com_packet.message_type,ret, packet);
 		conflag.static_buffer_provided = true;
 	}
 	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
@@ -932,11 +939,13 @@ template<typename T>
 SMCom_Status_t SMCom<T>::listener(void){
 	uint16_t len = HEADER_SIZE;
 	
-
 	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
+	
 	size_t avlb = __available__();
+	this->rx_buffer = bugfix_rx_buffer; //XXXXXXXXXXXXXXXXXXXXXX For bug fix, change it later
+
 	if(avlb >= HEADER_SIZE){
-		uint8_t * ptr = rx_buffer;
+		uint8_t * ptr = this->rx_buffer;
 		while(__available__() > 0 && __read__(ptr,1) == SMCOM_STATUS_SUCCESS){
 			if(*ptr == MESSAGE_START){
 				++ptr;
