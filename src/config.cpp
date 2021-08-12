@@ -8,6 +8,9 @@
 
 #define MAX_DATA_LENGTH 255
 
+uint8_t txbuffer[100000];
+uint8_t rxbuffer[100000];
+
 namespace py = pybind11;
 
 // compile code :
@@ -21,6 +24,9 @@ class pySMCOM_PUBLIC{
     uint8_t message_type;		        //<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
     uint8_t message_id;		            //<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
     std::vector<uint8_t> data;			//<! Data pointer for derived classes
+    pySMCOM_PUBLIC(){
+        data = std::vector<uint8_t>(100000, 0);
+    }
 };
 
 class SMCom_Pair{
@@ -28,32 +34,14 @@ class SMCom_Pair{
     std::vector<uint8_t> vec;
     SMCom_Status_t status;
     SMCom_Pair(){
-        vec = std::vector<uint8_t>(100, 0);
+        vec = std::vector<uint8_t>(100000, 0);
     }
-};
-
-auto vec_to_arr_uint16 = [](uint16_t size1, std::vector<uint8_t> buf) -> uint8_t* {
-    uint8_t* arr = new uint8_t(size1);
-    std::copy(buf.begin(), buf.end(), arr);
-    return arr;
-};
-
-auto vec_to_arr_uint8 = [](uint8_t size1, std::vector<uint8_t> buf) -> uint8_t* {
-    uint8_t* arr = new uint8_t(size1);
-    std::copy(buf.begin(), buf.end(), arr);
-    return arr;
-};
-
-auto arr_to_vec = [](uint16_t size1, const uint8_t* arr) -> std::vector<uint8_t> {
-    std::vector<uint8_t> vec(arr, arr+size1);
-    return vec;
 };
 
 class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     public:
-    py_smcom_tramp(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : SMCom::SMCom(rx_buf_size, tx_buf_size, id, NULL, NULL){;}
-	py_smcom_tramp(std::vector<uint8_t> rx_buffer, uint16_t rx_buf_size, std::vector<uint8_t> tx_buffer, uint16_t tx_buf_size, uint8_t id) : 
-                                    SMCom(vec_to_arr_uint16(rx_buf_size, rx_buffer), rx_buf_size, vec_to_arr_uint16(tx_buf_size, tx_buffer), tx_buf_size, id, NULL, NULL){;}
+    // py_smcom_tramp(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : SMCom::SMCom(rx_buf_size, tx_buf_size, id, NULL, NULL){;}
+	py_smcom_tramp(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : SMCom::SMCom(rxbuffer, rx_buf_size, txbuffer, tx_buf_size, id, NULL, NULL){;}
     
     virtual void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet) = 0;
     virtual void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, pySMCOM_PUBLIC packet) = 0;
@@ -61,23 +49,43 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     virtual SMCom_Pair __read__(uint16_t len) = 0;
 
     SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::write(receiver_id, message_id, vec_to_arr_uint8(len, buffer), len);
+        uint8_t buf[len];
+        for(int i = 0; i < len; i++){
+            buf[i] = buffer.at(i);
+        }
+        return SMCom<SMCOM_PUBLIC>::write(receiver_id, message_id, buf, len);
     }
 
     SMCom_Status_t handle_message_data(std::vector<uint8_t> buffer, uint16_t len){
-        return SMCom<SMCOM_PUBLIC>::handle_message_data(vec_to_arr_uint8(len, buffer), len);
+        uint8_t buf[len];
+        for(int i = 0; i < len; i++){
+            buf[i] = buffer.at(i);
+        }
+        return SMCom<SMCOM_PUBLIC>::handle_message_data(buf, len);
     }
 
     SMCom_Status_t push_to_queue(std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::push_to_queue(vec_to_arr_uint8(len, buffer), len);
+        uint8_t buf[len];
+        for(int i = 0; i < len; i++){
+            buf[i] = buffer.at(i);
+        }
+        return SMCom<SMCOM_PUBLIC>::push_to_queue(buf, len);
     }
 
     SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::respond(receiver_id, message_id, vec_to_arr_uint8(len, buffer), len);
+        uint8_t buf[len];
+        for(int i = 0; i < len; i++){
+            buf[i] = buffer.at(i);
+        }
+        return SMCom<SMCOM_PUBLIC>::respond(receiver_id, message_id, buf, len);
     }
 
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
-        return __write__(arr_to_vec(len, buffer), len);
+        std::vector<uint8_t> vec;
+        for(int i = 0; i < len; i++){
+            vec.push_back(buffer[i]);
+        }
+        return __write__(vec, len);
     }
 
     SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
@@ -85,9 +93,8 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
         SMCom_Status_t temp;
         SMCom_Pair tup = __read__(len);
         temp = tup.status;
-        vec = tup.vec;
         for(int i = 0; i < len; i++){
-            buffer[i] = vec[i];
+            buffer[i] = tup.vec.at(i);
         }
         return temp;
     }
@@ -106,7 +113,11 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     }
 
     SMCom_Status_t write_public(uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::write_public(message_id, vec_to_arr_uint8(len, buffer), len);
+        uint8_t buf[len];
+        for(int i = 0; i < len; i++){
+            buf[i] = buffer.at(i);
+        }
+        return SMCom<SMCOM_PUBLIC>::write_public(message_id, buf, len);
     }
 
     void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
@@ -135,9 +146,8 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
 class PySMCOM : public py_smcom_tramp {
 public:
     using tramp = py_smcom_tramp;
+    // PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(rx_buf_size, tx_buf_size, id){;}
     PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(rx_buf_size, tx_buf_size, id){;}
-    PySMCOM(std::vector<uint8_t> rx_buffer, uint16_t rx_buf_size, std::vector<uint8_t> tx_buffer, uint16_t tx_buf_size, uint8_t id) : 
-                                                                                    tramp(rx_buffer, rx_buf_size, tx_buffer, tx_buf_size, id){;}
     
     SMCom_Status_t __write__(std::vector<uint8_t> buffer, uint16_t len) override {
         PYBIND11_OVERRIDE_PURE(
@@ -231,9 +241,9 @@ void declareSMCom(py::module &m, const std::string& typestr) {
     .def_property_readonly_static("MAX_MSG_LENGTH", [](py::object) { return Class::MAX_MSG_LENGTH;});
 
     if(typeid(T) == typeid(SMCOM_PUBLIC)){
-        a.def(py::init<uint16_t, uint16_t, uint8_t>(),
-                                        "(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) -> SMCOM_PUBLIC")
-        .def(py::init<std::vector<uint8_t>, uint16_t, std::vector<uint8_t>, uint16_t, uint8_t>(), 
+        // a.def(py::init<uint16_t, uint16_t, uint8_t>(),
+        //                                 "(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) -> SMCOM_PUBLIC")
+        a.def(py::init<uint16_t, uint16_t, uint8_t>(), 
                                         "(std::vector<uint8_t> rx_buffer, uint16_t rx_buf_size, std::vector<uint8_t> tx_buffer, uint16_t tx_buf_size, uint8_t id) -> SMCOM_PUBLIC")
         .def("write", static_cast<SMCom_Status_t (Class::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&Class::write), 
                                         "(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")

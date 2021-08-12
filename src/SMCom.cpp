@@ -604,6 +604,7 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 	}
 	else{
 		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+		conflag.static_buffer_provided = true;
 	}
 
 	clear_tx_flag();
@@ -753,15 +754,13 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 	//if it is a request we won't call general tx handler because each request has its own callback function
 	if(tx_event_handler_callback_ptr == NULL){
 		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+		conflag.static_buffer_provided = true;
 	}
-	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
+	else if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 
 	return ret;
 }
-
-
-
 
 template<typename T>
 SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
@@ -881,8 +880,10 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 		}
 		packet = NULL;
 	}
+	memcpy(com_packet.data, raw_bytes, len);
 	if(rx_event_handler_callback_ptr == NULL){
 		__rx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+		conflag.static_buffer_provided = true;
 	}
 	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
 		rx_event_handler_callback_ptr(evt,ret,packet);
@@ -937,7 +938,6 @@ SMCom_Status_t SMCom<T>::listener(void){
 	if(avlb >= HEADER_SIZE){
 		uint8_t * ptr = rx_buffer;
 		while(__available__() > 0 && __read__(ptr,1) == SMCOM_STATUS_SUCCESS){
-			printf("%u\n", *ptr);
 			if(*ptr == MESSAGE_START){
 				++ptr;
 				break;
@@ -957,7 +957,6 @@ SMCom_Status_t SMCom<T>::listener(void){
 		else{
 			clear_rx_flag();
 		}
-		printf("here3");
 	}
 	return status;
 }

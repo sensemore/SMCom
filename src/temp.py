@@ -1,6 +1,6 @@
 import SMCom
 import serial
-import threading
+from threading import Thread
 import time
 import queue
 
@@ -16,11 +16,12 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.resume = True
         
     def __thread_func__(self):
-        while not self.threadKilled :
+        while not self.threadKilled:
             if self.resume:
                 self.listener()
         
     def __write__(self, buffer, length):
+        self.resume = False
         if buffer == None or buffer == [] or buffer == "" or buffer == b'':
             return SMCom.SMCOM_STATUS_FAIL
         elif type(buffer) == str:
@@ -64,13 +65,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
     def get_version(self, id):
         self.write(id, 10, [], 0)
-        SMCom_version = self.q.get().data
+        SMCom_version = self.q.get(timeout=5).data
         SMCom_version = f"{SMCom_version[2]}.{SMCom_version[1]}.{SMCom_version[0]}"
         return SMCom_version
     
     def get_mac_adress(self, id):
         self.write(id, 11, [0,0,0,0,0], 5)
-        data = self.q.get().data
+        data = self.q.get(timeout = 5).data
         mac_adress = [0 for i in range(6)]
         for i in range(len(data)-6):
             mac_adress[i] = hex(data[i])
@@ -87,21 +88,28 @@ class Wired(SMCom.SMCOM_PUBLIC):
         data.append(int.from_bytes(measurement_end.to_bytes(1, "little"), "little"))
         self.write(id, 13, data, 7)
         time.sleep(10)
+        self.q.get(timeout = 5)
         
     def read_measurement(self, id):
-        t = threading.Thread(target=self.__thread_func__, daemon=True)
-        t.start()
-        self.resume = False
         self.write(id, 14, [], 0)
-        self.resume = True
-        time.sleep(15)
-        self.threadKilled = True
-        t.join(timeout=0)
-        temp = self.q.get(timeout = 15)
+        time.sleep(10)
+        self.temp2 = self.q.get(timeout=5)
+        temp = self.q.get(timeout = 5)
         print(temp.data)
         data = temp.data
         print(temp.data_len)
         return data
+
+    def assign_address(self, id, mac_adress):
+        data = [0 for i in range(7)]
+        data[0] = id
+        mac_adress = mac_adress.split(':')
+        for i in range(len(mac_adress)):
+            mac_adress[i] = int(mac_adress[i], base = 16)
+        print(mac_adress)
+        data[1:] = mac_adress
+        self.write(255, 12, data, 7)
+        return True
         
     MESSAGES_SENSEWAY_WIRED = \
     [
@@ -128,9 +136,15 @@ class Wired(SMCom.SMCOM_PUBLIC):
     #     self.ser.close()
 
 nodeA = Wired(1024, 1024, 13)
+t = Thread(target=nodeA.__thread_func__, daemon=True)
+t.start()
 # nodeA.initialize_measurement(255, 3, 6, 10000, 1)
-print("SMCom version:", nodeA.read_measurement(255))
+print("SMCom version:", nodeA.get_version(255))
+print("SMCom version:", nodeA.get_mac_adress(255))
+print("SMCom version:", nodeA.get_version(255))
+# print("SMCom version:", nodeA.get_mac_adress(255))
 print("...")
+# t.join(timeout=0)
 nodeA.threadKilled = True
 nodeA.ser.close()
 
