@@ -93,7 +93,6 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     }
 
     SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) override {
-        SMCom_Status_t temp;
         SMCom_Pair tup = __read__(len);
         memcpy(buffer,tup.vec.data(),len);
         return tup.status;
@@ -124,14 +123,7 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
         pySMCOM_PUBLIC pypacket;
         
-        //printf("Data len :%d\n",packet->data_len);
-        
         pypacket.data = std::vector<uint8_t>(packet->data, packet->data + packet->data_len);
-        
-        // for (size_t i = 0; i < pypacket.data.size(); i++){
-        //     printf("%ld:[%0d]\n",i,pypacket.data[i]);
-        // }
-        
         pypacket.data_len = packet->data_len;
         pypacket.message_id = packet->message_id;
         pypacket.message_type = packet->message_type;
@@ -158,7 +150,6 @@ public:
     // PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(rx_buf_size, tx_buf_size, id){;}
     explicit PySMCOM(uint8_t id) : tramp(id){;}
     ~PySMCOM(){
-        printf("PySMCOM desturctor\n");
     };
     
     SMCom_Status_t __write__(std::vector<uint8_t> buffer, uint16_t len) override {

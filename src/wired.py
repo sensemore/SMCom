@@ -42,6 +42,13 @@ sampling_frequency_dict = {
 }
 
 
+class fbgpacket:
+    data_len = 0			    
+    receiver_id = 0		    
+    transmitter_id = 0	        
+    message_type = 0		    
+    message_id = 0	         
+    data = 0
 
 class Wired(SMCom.SMCOM_PUBLIC):
     def __init__(self, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
@@ -59,6 +66,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
     def __thread_func__(self):
         while True:
             self.listener()
+            time.sleep(0.5) ## bug fix için
         
     def __write__(self, buffer, length):
         if buffer == None or buffer == [] or buffer == "" or buffer == b'':
@@ -78,13 +86,16 @@ class Wired(SMCom.SMCOM_PUBLIC):
         return SMCom.SMCOM_STATUS_SUCCESS
 
     def __rx_callback__(self, event, status, packet):
-        temp_packet = SMCom.pySMCOM_PUBLIC()
+        import copy
+        temp_packet = fbgpacket()#SMCom.pySMCOM_PUBLIC()
+        print(id(temp_packet))
         temp_packet.data = packet.data
         temp_packet.message_id = packet.message_id			   
         temp_packet.receiver_id = packet.receiver_id		 
         temp_packet.transmitter_id = packet.transmitter_id
         temp_packet.message_type = packet.message_type  
         temp_packet.data_len = packet.data_len
+        print("__rx invoked, putting:",temp_packet)
         self.data_queue.put(temp_packet)
 
     def __tx_callback__(self, event, status, packet):
@@ -108,6 +119,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         for i in temp:
             buffer.append(i)
         pair.vec = buffer
+        print("in __read__ buffer:",buffer,length)
         pair.status = SMCom.SMCOM_STATUS_SUCCESS
         return pair
 
@@ -148,12 +160,19 @@ class Wired(SMCom.SMCOM_PUBLIC):
             return self.data_queue.get(timeout = expected_timeout)
         
         
-    def read_measurement(self, id, sample_size):
+    def read_measurement(self, id, sample_size, timeout = 10):
         #Wait for all packets
         byte_offset = 0 # Start from the beginning
         data_len = sample_size * 6 #Convert to bytes
         
-
+        data = [*tuple(byte_offset.to_bytes(4, "little")),*tuple(data_len.to_bytes(4, "little"))]
+        self.write(id, SMCOM_WIRED_MESSAGES.GET_BATCH_MEASUREMENT_CHUNK.value, data, len(data))
+        
+        already_read_len = 0
+        reverse_data_len = data_len
+        while(already_read_len != reverse_data_len):
+            packet = self.data_queue.get(timeout = timeout)
+            reverse_data_len = reverse_data_len - packet.len
     
     def measure(self,id,acc, freq, sample_size):
         pass
