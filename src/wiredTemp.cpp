@@ -284,3 +284,259 @@ typedef struct resp_get_sum{
 
 };
 #endif
+
+
+typedef struct ongoing_firmware_info_struct{
+    FILE * bin_file; //File that contains the binary data
+    
+    /*
+        const uint8_t * bin_array; //File that contains the binary data
+        uint32_t array_iter; //Iterates in terms of bytes, no uint32_t iteration!
+    */
+
+    MP_Senseway_to_Wired::msg_enter_firmware_updater mefu;
+    MP_Senseway_to_Wired::msg_firmware_packet_start mfpstart;
+    MP_Senseway_to_Wired::msg_firmware_packet mfp;
+    MP_Senseway_to_Wired::msg_firmware_packet_end mfpend;
+
+    uint8_t sequence;
+
+}ongoing_firmware_info_struct;
+
+sm_err_t Senseway_WiredClient::device_firmware_update(const SM_MacAddress &devmac,const char* file_name){
+    
+    using namespace MP_Senseway_to_Wired;
+
+    int8_t wired_id = get_wired_id(devmac);
+    if(wired_id == -1) {
+        return sm_err_t::NO_DEVICE;
+    }
+
+    FILE * fp = SM_File_System::get_file(file_name,"rb");
+    if(fp == NULL){
+        SM_LOGE("File '%s' pointer is NULL",file_name);
+        return sm_err_t::FILE_SYSTEM_ERROR;
+    }
+    /*
+        We can deduce the size of the file
+    */
+
+	fseek(fp,0,SEEK_END);
+	uint32_t file_size = ftell(fp);
+	rewind(fp);
+
+    if(file_size == 0){
+        SM_LOGE("Empty file %s",file_name);
+        return sm_err_t::EMPTY_FILE;
+    }
+
+
+    SM_LOGW("Starting device firmware update, mac %s",devmac.as_string());
+    
+    //Do not forget the clean ongoing firmware, otherwise new firmware won't start!
+	ongoing_firmware_info_struct * of = (ongoing_firmware_info_struct*) malloc(sizeof(ongoing_firmware_info_struct));
+    if(of == NULL){
+        return sm_err_t::ERROR;
+    }
+
+
+
+    //Sequence starts with init
+    of->sequence = WIRED_FIRMWARE_SEQUENCE_INITIALIZED;
+    //The file pointer that we are gonna use and read chunk by chunk
+	of->bin_file = fp;
+    //Total file size, file must not contain anything other than firmware binary
+    of->mfpstart.size = file_size;
+    /*
+        This claculation is just telling wired how many packets we are gonna send through this process
+        Probably it would be 240*N + half packet
+    */
+    of->mfpstart.no_packets = (file_size/sizeof(msg_firmware_packet::data));// + ((file_size % sizeof(msg_firmware_packet::data) != 0));
+    
+    SM_LOGI("Calculated total packets to send wired %lu",of->mfpstart.no_packets);
+
+    //Start with packet number 'one'
+    of->mfp.packet_no = 1;
+    //Copy mac address to fields so no need to copy again and again
+    memcpy(of->mefu.mac,devmac.get_native_address(),6);
+    memcpy(of->mfpstart.mac,devmac.get_native_address(),6);
+    memcpy(of->mfp.mac,devmac.get_native_address(),6);
+    memcpy(of->mfpend.mac,devmac.get_native_address(),6);
+
+    const TickType_t wait_time = pdMS_TO_TICKS(5000);
+
+    auto dev = device_set.find(client_device(devmac));
+
+    
+    wired_id = MP_Senseway_to_Wired::BOOTLOADER_AND_FIRMWARE_UPDATER_ID;
+    
+    int retry = 0;
+    while(retry < WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET){
+        if(of->sequence == WIRED_FIRMWARE_SEQUENCE_INITIALIZED){
+            
+            SM_LOGD("Sending enter firmware update msg retry[%d]",retry);
+            
+            rs485stw.sm_uart.set_baudrate(RS485_Senseway_to_Wired_BAUDRATE);
+            
+            xQueueReset(rs485stw_rx_queue);
+            
+            SMCom_Status_t ret = rs485stw.write(PUBLIC_ID_4BIT,
+                                            MP_Senseway_to_Wired::ENTER_FIRMWARE_UPDATER_MODE,
+                                            (uint8_t*)&(of->mefu),
+                                            sizeof(MP_Senseway_to_Wired::msg_enter_firmware_updater));
+            
+            rs485stw.sm_uart.set_baudrate(RS485_Senseway_to_Wired_FIRMWARE_UPDATE_BAUDRATE);
+
+            if(ret == SMCOM_STATUS_SUCCESS){
+                SM_LOGV("Send message to wired succesfully");
+                SMCOM_PUBLIC * packet = NULL;
+                bool is_received = block_and_wait_wired_for_message(&packet, wired_id, MP_Senseway_to_Wired::ENTER_FIRMWARE_UPDATER_MODE, wait_time);
+                if(is_received){
+                    resp_enter_firmware_updater * refu = (resp_enter_firmware_updater *) packet->data;
+                    //Also check the mac address
+                    if(devmac == refu->mac){
+                        SM_LOGI("Device entered the firmware updater mode");
+                        of->sequence = WIRED_FIRMWARE_SEQUENCE_STARTED;
+                        retry = 0;
+                        free(packet);
+                        continue;
+                    }
+                }
+                SM_LOGI("Can't receive packet from wired");
+                free(packet);
+            }
+            else{
+                SM_LOGE("Smcom error:%d",ret);
+            }
+        }
+        else if(of->sequence == WIRED_FIRMWARE_SEQUENCE_STARTED){
+            
+            xQueueReset(rs485stw_rx_queue);
+
+            SM_LOGD("Sending firmware packet start retry[%d]",retry);
+            SMCom_Status_t ret = rs485stw.write(wired_id,
+                                                MP_Senseway_to_Wired::FIRMWARE_PACKET_START,
+                                                (uint8_t*)&(of->mfpstart),
+                                                sizeof(msg_firmware_packet_start));
+            
+            if(ret == SMCOM_STATUS_SUCCESS){
+                SMCOM_PUBLIC * packet = NULL;
+                bool is_received = block_and_wait_wired_for_message(&packet, wired_id, MP_Senseway_to_Wired::FIRMWARE_PACKET_START, wait_time);
+                if(is_received){
+                    resp_firmware_packet_start * rfps = (resp_firmware_packet_start *) packet->data;
+                    //Also check the mac address
+                    if(devmac == rfps->mac && rfps->status == MP_Senseway_to_Wired::SUCCESS){
+                        of->sequence = WIRED_FIRMWARE_SEQUENCE_SENDING_PACKETS;
+                        of->mfp.packet_no = 1;
+                        retry = 0;
+                        free(packet);
+                        continue;
+                    }
+                }
+                free(packet);
+            }
+        }
+        else if(of->sequence == WIRED_FIRMWARE_SEQUENCE_SENDING_PACKETS){
+        
+            uint8_t read_len = sizeof(msg_firmware_packet::data) < file_size ? sizeof(msg_firmware_packet::data) : file_size;
+            
+            if(of->mfp.packet_no % 20 == 0){
+                SM_LOGV("Wired Fw packet:%d",of->mfp.packet_no);
+            }
+
+            /*
+                Instead of using fseek, we just read one time from file and try to send it after that we will continue to send the same data
+            */
+            if(retry == 0){
+                fread(of->mfp.data, sizeof(uint8_t), read_len, fp);
+            }
+
+            xQueueReset(rs485stw_rx_queue);
+            SMCom_Status_t ret = rs485stw.write(wired_id,
+                                                MP_Senseway_to_Wired::FIRMWARE_PACKET,
+                                                (uint8_t*)&(of->mfp),
+                                                sizeof(msg_firmware_packet));
+
+            if(ret == SMCOM_STATUS_SUCCESS){
+                SMCOM_PUBLIC * packet = NULL;
+                bool is_received = block_and_wait_wired_for_message(&packet, wired_id, MP_Senseway_to_Wired::FIRMWARE_PACKET, wait_time);
+                if(is_received){
+                    resp_firmware_packet * rfp = (resp_firmware_packet *) packet->data;
+                    //Also check the mac address
+                    if(devmac == rfp->mac && rfp->status == MP_Senseway_to_Wired::SUCCESS){
+                        free(packet);
+                        of->mfp.packet_no++;
+                        file_size -= read_len;
+                        retry = 0;
+                        //A little bit of delay is good for wired internal buffer, pushing so fast is so fast for its DMA
+                        vTaskDelay(5);
+
+                        if(file_size == 0){
+                            //Last packet is sent, change the state
+                            SM_LOGV("Changing sequence packets to finished");
+                            of->sequence = WIRED_FIRMWARE_SEQUENCE_FINISHED;
+                        }
+                        continue;
+                    }
+                    else{
+                        SM_LOGW("Wired returned %u",rfp->status);
+                    }
+                }
+                else{
+                    SM_LOGE("Couldn't receive packet");
+                }
+                free(packet);
+            }            
+        }
+        else if(of->sequence == WIRED_FIRMWARE_SEQUENCE_FINISHED){
+            SM_LOGD("Sending firmware packet end retry[%d]",retry);
+            xQueueReset(rs485stw_rx_queue);
+            SMCom_Status_t ret = rs485stw.write(wired_id,
+                                                MP_Senseway_to_Wired::FIRMWARE_PACKET_END,
+                                                (uint8_t*)&(of->mfpend),
+                                                sizeof(msg_firmware_packet_end));
+            if(ret == SMCOM_STATUS_SUCCESS){
+                SMCOM_PUBLIC * packet = NULL;
+                bool is_received = block_and_wait_wired_for_message(&packet, wired_id, MP_Senseway_to_Wired::FIRMWARE_PACKET_END, wait_time);
+                if(is_received){
+                    resp_firmware_packet_end * rfpe = (resp_firmware_packet_end *) packet->data;
+                    //Also check the mac address
+                    if(devmac == rfpe->mac && rfpe->status == MP_Senseway_to_Wired::SUCCESS){
+                        //Now we have finished succesfully, finish it
+                        SM_LOGI("Firmware update for '%s' finished succesfully",devmac.as_string());
+                        rs485stw.sm_uart.set_baudrate(RS485_Senseway_to_Wired_BAUDRATE);
+                        free(packet);
+                        free(of);
+                        fclose(fp);
+
+                        //Remove wired from the list otherwise we assume it is already in the list
+                        //but device restarts itself
+                        device_set.erase(dev);
+                        update_shared_device_set(device_set);
+
+                        vTaskDelay(pdMS_TO_TICKS(10000)); //Wait for wired to finish writing
+                        return sm_err_t::SUCCESS;
+                    }
+                    else{
+                        SM_LOGW("Wired returned %u",rfpe->status);
+                    }
+                }
+                free(packet);
+            }
+        }
+        ++retry;
+    }
+
+    if(of->sequence >= WIRED_FIRMWARE_SEQUENCE_STARTED){
+        //If somehow wired entered to different sections other than APP
+        device_set.erase(dev);
+        update_shared_device_set(device_set);
+    }
+
+    fclose(fp);
+    free(of);
+    SM_LOGE("Timeout occured!");
+    
+    rs485stw.sm_uart.set_baudrate(RS485_Senseway_to_Wired_BAUDRATE);    
+    return sm_err_t::TIMEOUT;
+}

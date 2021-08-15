@@ -17,3 +17,4 @@ sample = 100
 print("#"*60)
 #meas = dev.read_measurement(0xFF,sample)
 meas = dev.measure(0xFF,"16G",12800,sample)
+telems = dev.get_all_telemetry(0xFF)

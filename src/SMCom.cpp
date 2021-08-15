@@ -21,6 +21,9 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event
 
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
+
+	clear_rx_flag();
+	clear_tx_flag();
 }
 
 template<>
@@ -35,6 +38,9 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 	tx_event_handler_callback_ptr = tx;
 
 	conflag.static_buffer_provided = true;
+
+	clear_rx_flag();
+	clear_tx_flag();
 }
 
 
@@ -167,6 +173,9 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
+
+	clear_rx_flag();
+	clear_tx_flag();
 }
 
 template<>
@@ -184,6 +193,9 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 	com_packet.transmitter_id = id;
 
 	conflag.static_buffer_provided = true;
+
+	clear_rx_flag();
+	clear_tx_flag();
 }
 
 template<>
@@ -742,6 +754,7 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 	clear_tx_flag();
 
 	if(tx_buffer && tx_buf_size){
+		smcom_log("calling common write tx");
 		ret = common_write_txbuffer(buffer,len);
 	}
 	else{
@@ -791,6 +804,7 @@ SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes,
 	if(additional_buffer_check() != SMCOM_STATUS_SUCCESS){
 		rxflag.rx_tx_id_flag = 0;
 		rxflag.port_busy_flag = 1;
+		
 		return SMCOM_STATUS_PORT_BUSY;
 	}
 	//Set the flag we are responsible of this message!
@@ -814,6 +828,7 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 	//The following error checkings should not invoke rx_callback function, they are strongly forbidden to user
 	if(len != (rx_buffer[1]+3) ) ret = SMCOM_STATUS_MESSAGE_LENGTH_ERROR;
 	if(raw_bytes[len-1] != MESSAGE_END) ret = SMCOM_STATUS_END_BYTE_ERROR;
+
 
 	if(ret != SMCOM_STATUS_DEFAULT){
 		clear_rx_flag();
