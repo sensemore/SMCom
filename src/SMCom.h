@@ -1,14 +1,21 @@
 #ifndef SMCOM_H
 #define SMCOM_H
 
+#ifdef SMCOM_DEBUG
+#define smcom_log(s,...) (printf("[%d-%s]" s "\n",__LINE__,__func__,##__VA_ARGS__))
+#else
+#define smcom_log(s,...)
+#endif
+
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
 
-// #ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
-// #define SMCOM_CONFIG_REQUEST_RESPONSE
-// #endif
+//#ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
+//#define SMCOM_CONFIG_REQUEST_RESPONSE
+//#endif
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 #include <ctime>
@@ -20,10 +27,10 @@
 //  SMCOM_VERSION % 100 : patch level
 //  SMCOM_VERSION / 100 % 1000 : minor version
 //  SMCOM_VERSION / 100000 : major version
-#define SMCOM_PATCH_LEVEL__ 	0
-#define SMCOM_MINOR_VERSION__ 	1
-#define SMCOM_MAJOR_VERSION__ 	0
-#define SMCOM_VERSION_STRING	"0.1.1"
+#define SMCOM_MAJOR_VERSION__ 	1
+#define SMCOM_MINOR_VERSION__ 	0
+#define SMCOM_PATCH_LEVEL__ 	1
+#define SMCOM_VERSION_STRING	"1.0.1"
 #define SMCOM_VERSION (SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__
 
 /*
@@ -194,17 +201,19 @@ typedef struct smcom_message_get_version_struct__{
 }__attribute__((packed)) smcom_message_get_version_struct__;
 
 
+
 template <typename CT>
 class SMCom{
 public:
 	typedef void (*rx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	rx_event_handler_callback rx_event_handler_callback_ptr = NULL;
-	
+
 	typedef void (*tx_event_handler_callback)(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	tx_event_handler_callback tx_event_handler_callback_ptr = NULL;
 
 	virtual void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	virtual void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
+
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
@@ -308,11 +317,6 @@ protected:
 
 private:
 
-	//############### For bug fix!
-	uint8_t * bugfix_rx_buffer = NULL;
-	uint8_t * bugfix_tx_buffer = NULL;
-	//###############
-
 	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);
 	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len);
@@ -393,5 +397,4 @@ private:
 };
 
 
-// #include "SMCom.tpp"
 #endif

@@ -169,10 +169,8 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 	com_packet.transmitter_id = id;
 }
 
-
 template<>
 SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx){
-		
 	this->rx_buffer = rx_buffer;
 	this->tx_buffer = tx_buffer;
 
@@ -184,9 +182,6 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
-
-	this->bugfix_rx_buffer = rx_buffer;
-	this->bugfix_tx_buffer = tx_buffer;
 
 	conflag.static_buffer_provided = true;
 }
@@ -607,9 +602,6 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 	if(tx_event_handler_callback_ptr != NULL){
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 	}
-	else{
-		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
-	}
 
 	clear_tx_flag();
 
@@ -621,11 +613,9 @@ template<typename T>
 SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len){
 	//before calling this function check that txbuffer is not null
 
-	this->tx_buffer = bugfix_tx_buffer; //XXXXXXXXX for bug fix
-
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
-	memcpy(com_packet.data, buffer, len);
+
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
 
@@ -758,14 +748,14 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 		ret = common_write_polling(buffer,len);
 	}
 	//if it is a request we won't call general tx handler because each request has its own callback function
-	if(tx_event_handler_callback_ptr == NULL){
-		__tx_callback__((SMCom_event_types)com_packet.message_type,ret, &com_packet);
-	}
-	else if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
+	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
 
 	return ret;
 }
+
+
+
 
 template<typename T>
 SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
@@ -885,12 +875,14 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 		}
 		packet = NULL;
 	}
-	memcpy(com_packet.data, raw_bytes, len);
-	if(rx_event_handler_callback_ptr == NULL){
-		__rx_callback__((SMCom_event_types)com_packet.message_type,ret, packet);
-	}
-	if(packet != NULL && rx_event_handler_callback_ptr != NULL){
-		rx_event_handler_callback_ptr(evt,ret,packet);
+
+	if(packet != NULL){
+		if(rx_event_handler_callback_ptr == NULL){
+			__rx_callback__(evt,ret,packet);
+		}
+		else{
+			rx_event_handler_callback_ptr(evt,ret,packet);
+		}
 	}
 
 	clear_rx_flag();
@@ -912,6 +904,18 @@ SMCom_Status_t SMCom<T>::common_respond_smcom_special_messages(T * packet){
 }
 
 
+
+template<typename T>
+void SMCom<T>::__rx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
+	;
+}
+
+
+template<typename T>
+void SMCom<T>::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
+	;
+}
+
 template<typename T>
 SMCom_Status_t SMCom<T>::__read__(uint8_t * buffer, uint16_t len){
 	return SMCOM_STATUS_FAIL;
@@ -923,27 +927,14 @@ size_t SMCom<T>::__available__(){
 }
 
 template<typename T>
-void SMCom<T>::__rx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
-	return;
-}
-
-template<typename T>
-void SMCom<T>::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
-	return;
-}
-
-template<typename T>
 SMCom_Status_t SMCom<T>::listener(void){
 	uint16_t len = HEADER_SIZE;
 	
+
 	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
-	
 	size_t avlb = __available__();
-	this->rx_buffer = bugfix_rx_buffer; //XXXXXXXXXXXXXXXXXXXXXX For bug fix, change it later
-	
 	if(avlb >= HEADER_SIZE){
-		this->rx_buffer = bugfix_rx_buffer;
-		uint8_t * ptr = this->rx_buffer;
+		uint8_t * ptr = rx_buffer;
 		while(__available__() > 0 && __read__(ptr,1) == SMCOM_STATUS_SUCCESS){
 			if(*ptr == MESSAGE_START){
 				++ptr;
@@ -964,7 +955,6 @@ SMCom_Status_t SMCom<T>::listener(void){
 		else{
 			clear_rx_flag();
 		}
-		
 	}
 	return status;
 }
