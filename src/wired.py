@@ -7,7 +7,7 @@ import atexit
 from enum import Enum
 
 BAUD_RATE = 115200
-PORT = '/dev/ttyUSB0'
+PORT = '/dev/ttyUSB1'
 WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET = 5
 
 class SMCOM_WIRED_MESSAGES(Enum):
@@ -91,7 +91,8 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.data_queue = queue.Queue()
         self.mutex = threading.Lock()
         self.mutex_timeout = 10
-
+        self.version = self.get_version(15)
+        self.mac_address = self.get_mac_address(15)
         self.continue_thread = True
         
         self.listener_thread = threading.Thread(target=self.__thread_func__, daemon=True)
@@ -119,7 +120,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
             elif type(buffer[0]) == str:
                 buffer = bytes("".join(buffer), "utf-8")
 
-        if(self.mutex.acquire(blocking=True,timeout=self.mutex_timeout)):
+        if(self.mutex.acquire(blocking=True, timeout=self.mutex_timeout)):
             self.ser.write(buffer)
             self.ser.flush()
             self.mutex.release()
@@ -184,7 +185,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         version = f"{SMCom_version[2]}.{SMCom_version[1]}.{SMCom_version[0]}"
         return version
     
-    def get_mac_adress(self, id, timeout = 3):
+    def get_mac_address(self, id, timeout = 3):
         #Check the write return maybe we get error
         self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
         #Check also queue data receiver id!, maybe not desired message
@@ -314,9 +315,11 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         return telemetries
 
-    def firmware_update(self, id, mac, bin_file_address,timeout = 10):
-        #Bin dosyası okunup bir list içine alınacak ve list içinde ayrı listelerde paket paket datalar olacak
-        #Max data boyutu 240 byte olmalı
+    def firmware_update(self, receiver_id, mac, bin_file_address, timeout = 10):
+        """
+        Takes receiver_id, mac_address, address of binary file, and timeout(default 10) and return SMCom_Status_t 
+        or WIRED_MESSAGE_STATUS type as int.
+        """
         bin_file = open(bin_file_address, "rb")
         packets = []
 
@@ -324,7 +327,8 @@ class Wired(SMCom.SMCOM_PUBLIC):
             temp = bin_file.read(240)
             if temp == b'':
                 break
-            packets.append(temp)
+            packets.append(list(temp))
+        packets[-1] += [0] * (240 - len(packets[-1]))
         
         bin_file_size = 240*(len(packets)-1) + len(packets[-1])
         if bin_file_size == 0:
@@ -336,78 +340,80 @@ class Wired(SMCom.SMCOM_PUBLIC):
         print("Device mac:",mac)
         enter_message = mac
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, enter_message, len(enter_message))
+        
         self.ser.baudrate = 1000000
         enter_mac_return = self.data_queue.get(timeout = timeout).data
         if enter_mac_return != mac:
             return SMCom.SMCOM_STATUS_FAIL
-        # try:
-        if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
-            return write_ret
+        try:
+            if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
+                return write_ret
 
-        print("Device entered firmware updater mode")
-        id = 12 # This is predefined id for bootloader
-        no_packets = len(packets)
-        print(len(packets)) # should be 159 !!!
+            print("Device entered firmware updater mode")
+            bootloader_id = 12 # This is predefined id for bootloader
+            no_packets = len(packets) - 1
 
-        start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac)]
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_START.value, start_message, len(start_message))
-        
-        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
-            return write_ret
-        
-        read_ret = self.data_queue.get(timeout = timeout).data
-        start_mac_return = read_ret[1:]
-        status = read_ret[0]
-
-        if mac != start_mac_return and status != WIRED_MESSAGE_STATUS.SUCCESS.value:
-            return SMCom.SMCOM_STATUS_FAIL
+            start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac)]
+            write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_START.value, start_message, len(start_message))
             
-        for packet_no in range(no_packets):
-            retry = 0
-            wired_packet_no = packet_no + 1
-            success = False
-            data_packet = [*tuple(packets[packet_no]), *tuple(mac), *tuple(wired_packet_no.to_bytes(2, "little"))]
-            print(data_packet)
-            while retry < WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET:
-                retry += 1
-                write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, data_packet, len(data_packet))
-                print(len(data_packet)) #should be 232 + 8
+            if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                return write_ret
+            
+            read_ret = self.data_queue.get(timeout = timeout).data
+            start_mac_return = read_ret[1:]
+            status = read_ret[0]
 
-                resp_msg_data = self.data_queue.get(timeout = timeout).data
-                print(f"retry: {retry} for packet_no {wired_packet_no}")
-                if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
-                    print(read_ret)
-                    continue
-                
-                read_ret = resp_msg_data[0]
-                packet_mac_return = resp_msg_data[1:]     # resp data[0] is wired status and 1: is mac address returned wrt the msg
-                if mac != packet_mac_return and read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
-                    print(read_ret)
-                    continue
-
-                success = True
-                print(f"packet {wired_packet_no} success")
-                break
-
-            if not success:
+            if mac != start_mac_return or status != WIRED_MESSAGE_STATUS.SUCCESS.value:
                 return SMCom.SMCOM_STATUS_FAIL
-                
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [*tuple(mac)], len(mac))
-        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
-            return write_ret
+            
+            for packet_no in range(no_packets + 1):
+                retry = 0
+                wired_packet_no = packet_no + 1
+                success = False
+                data_packet = [*tuple(packets[packet_no]), *tuple(mac), *tuple(wired_packet_no.to_bytes(2, "little"))]
+                while retry < WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET:
+                    retry += 1
+                    write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, data_packet, len(data_packet))
+                    resp_msg_data = self.data_queue.get(timeout = timeout).data
+                    print(f"retry: {retry} for packet_no {wired_packet_no}")
+                    if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                        print("write error:",write_ret)
+                        continue
+                    if packet_no == 158:
+                        print(f"packet {wired_packet_no}:", data_packet)
+                    read_ret = resp_msg_data[0]
+                    packet_mac_return = resp_msg_data[1:7]     # resp data[0] is wired status and 1: is mac address returned wrt the msg
+                    ret_packet_no = resp_msg_data[7:]
+                    print(ret_packet_no)
+                    if mac != packet_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                        print("data error:",read_ret)
+                        continue
 
-        resp_end = self.data_queue.get(timeout = timeout).data
-        read_ret = resp_end[0]
-        end_mac_return = resp_end[1:]
-        if mac != end_mac_return and read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
-            return SMCom.SMCOM_STATUS_FAIL
-        time.sleep(10)
-        print("Firmware Updated!!!")
-        self.ser.baudrate = 115200
-        # except:
-        #     print("error")
-        # finally:
-        #     self.ser.baudrate = 115200
+                    success = True
+                    print(f"packet {wired_packet_no} success")
+                    break
+
+                if not success:
+                    return SMCom.SMCOM_STATUS_FAIL
+
+            #Data transmission ended successfully
+                    
+            write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [*tuple(mac)], len(mac))
+            if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                return write_ret
+
+            resp_end = self.data_queue.get(timeout = timeout).data
+            read_ret = resp_end[0]
+            print(read_ret)
+            end_mac_return = resp_end[1:]
+            if mac != end_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                return SMCom.SMCOM_STATUS_FAIL
+            time.sleep(5)
+            print("Firmware Updated to version:", self.get_version(receiver_id))
+        except:
+            print("An error occurred while firmware update")
+        finally:
+            self.ser.baudrate = 115200
     
         
     MESSAGES_SENSEWAY_WIRED = \

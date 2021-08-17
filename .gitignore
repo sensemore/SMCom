@@ -4,3 +4,4 @@ wrapping.code-workspace
 src/SMCom.h.gch
 *.so
 *.out
+wiredTemp.cpp
