@@ -82,6 +82,10 @@ class Wired(SMCom.SMCOM_PUBLIC):
     accelerometer_coefficients= [(2*2)/(1<<16), (2*2)/(1<<16), (4*2)/(1<<16), (8*2)/(1<<16), (16*2)/(1<<16)]
 
     def __init__(self, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
+        """
+        Takes rx_buffer_size, tx_buffer_size and transmitter_id as arguments; 
+        creates and returns a wired(inherited from SMCom<SMCOM_PUBLIC>)
+        """
         super().__init__(device_id)
         
         self.ser = serial.Serial(PORT, BAUD_RATE)
@@ -415,15 +419,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
         finally:
             self.ser.baudrate = 115200
     
-        
-    MESSAGES_SENSEWAY_WIRED = \
-    [
+    MESSAGES_SENSEWAY_WIRED = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
         ("GET_VERSION",                     get_version),
-        ("AUTO_ADDRESSING_INIT",            0),
+        ("AUTO_ADDRESSING_INIT",            get_mac_address),
         ("AUTO_ADDRESSING_SET_NEW_ID",      0),
-        ("START_BATCH_MEASUREMENT",         0),
-        ("GET_BATCH_MEASUREMENT",           0),
+        ("START_BATCH_MEASUREMENT",         start_batch_measurement),
+        ("GET_BATCH_MEASUREMENT",           read_measurement),
         ("GET_CLEARANCE",                   0),
         ("GET_CREST",                       0),
         ("GET_GRMS",                        0),
@@ -431,7 +433,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         ("GET_SKEWNESS",                    0),
         ("GET_BATCH_MEASUREMENT_CHUNK",     0),
         ("AUTO_ADDRESSING_INTEGRITY_CHECK", 0),
-        ("GET_ALL_TELEMETRY",               0),
+        ("GET_ALL_TELEMETRY",               get_all_telemetry),
         ("GET_VRMS",                        0),
         ("GET_PEAK",                        0),
         ("GET_SUM",                         0)
