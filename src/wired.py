@@ -7,7 +7,8 @@ import atexit
 from enum import Enum
 
 BAUD_RATE = 115200
-
+PORT = '/dev/ttyUSB0'
+WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET = 5
 
 class SMCOM_WIRED_MESSAGES(Enum):
     #------------- Bootloader Messages ---------------- 
@@ -56,7 +57,6 @@ sampling_frequency_dict = {
     "12800":9
 }
 
-
 class PySMComPacket:
     data_len = 0			    
     receiver_id = 0		    
@@ -84,7 +84,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
     def __init__(self, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
         super().__init__(device_id)
         
-        self.ser = serial.Serial('/dev/ttyUSB0', BAUD_RATE)
+        self.ser = serial.Serial(PORT, BAUD_RATE)
 
         atexit.register(self.__cleanup)
         
@@ -121,6 +121,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         if(self.mutex.acquire(blocking=True,timeout=self.mutex_timeout)):
             self.ser.write(buffer)
+            self.ser.flush()
             self.mutex.release()
             return SMCom.SMCOM_STATUS_SUCCESS
         else:
@@ -171,15 +172,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
             return pair
         else:
             return None
-
-    def dirty_listener(self,wait_packet_no):
-        return
-        while(self.data_queue.qsize() == 0):
-            self.listener()
-        
-        while(wait_packet_no != 0):
-            self.listener()
-            wait_packet_no -= 1
 
     def get_version(self, id, timeout = 3):
         #Check the write return maybe we get error
@@ -266,7 +258,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         return measurement_data
 
-    
     def measure(self,id,acc, freq, sample_size, timeout=10):
         if(self.start_batch_measurement(id,acc,freq,sample_size,notify_measurement_end=True) == True):
             coef = self.accelerometer_coefficients[acc_range_dict[acc]]
@@ -286,71 +277,137 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         import struct
         def convert_byte_list_to_double(bl):
-            return struct.unpack('d',bytes(bl))
-        # double clearance[3];
-        # double crest[3];
-        # double grms[3];
-        # double kurtosis[3];
-        # double skewness[3];
-        # //Included in v1.0.9
-        # double vrms[3];
-        # double peak[3];
-        # double sum[3];
-        # //Included in v1.0.13
-        # double peak_to_peak[3];
+            return struct.unpack('d',bytes(bl))[0]
 
+        start = 0
+        def byte_list_to_double_list(bl):
+            nonlocal start
+            dl = [  convert_byte_list_to_double(bl[start:start+8]),
+                    convert_byte_list_to_double(bl[start+8:start+16]),
+                    convert_byte_list_to_double(bl[start+16:start+24])]
+            start += 8
+            return dl
     
-        clearance = [   convert_byte_list_to_double(telemetries[0:8]),
-                        convert_byte_list_to_double(telemetries[8:16]),
-                        convert_byte_list_to_double(telemetries[16:24])]
-    
+        clearance = byte_list_to_double_list(telemetries)
+        crest = byte_list_to_double_list(telemetries)
+        grms = byte_list_to_double_list(telemetries)
+        kurtosis = byte_list_to_double_list(telemetries)
+        skewness = byte_list_to_double_list(telemetries)
+        vrms = byte_list_to_double_list(telemetries)
+        peak = byte_list_to_double_list(telemetries)
+        sum = byte_list_to_double_list(telemetries)
+        peak_to_peak = byte_list_to_double_list(telemetries)
 
         telemetries = {
             "temperature":temperature/100,
             "calibrated_frequency":calibrated_frequency,
             "clearance":clearance,
+            "crest":crest,
+            "grms":grms,
+            "kurtosis":kurtosis,
+            "skewness":skewness,
+            "vrms":vrms,
+            "peak":peak,
+            "sum":sum,
+            "peak_to_peak":peak_to_peak
         }
 
         return telemetries
 
-    def firmware_update(self,id,mac,bin_file,timeout = 10):
+    def firmware_update(self, id, mac, bin_file_address,timeout = 10):
         #Bin dosyası okunup bir list içine alınacak ve list içinde ayrı listelerde paket paket datalar olacak
         #Max data boyutu 240 byte olmalı
+        bin_file = open(bin_file_address, "rb")
+        packets = []
+
+        while True:
+            temp = bin_file.read(240)
+            if temp == b'':
+                break
+            packets.append(temp)
         
-        packets = [] #fill
-        bin_file_size = 0 #fill
-        #Read file here
-
-
+        bin_file_size = 240*(len(packets)-1) + len(packets[-1])
+        if bin_file_size == 0:
+            print("Empty File")
+            return
         if(isinstance(mac,str)):
             mac = [int(ff,16) for ff in mac.split(':')]    
 
         print("Device mac:",mac)
         enter_message = mac
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, enter_message, len(enter_message))
+        self.ser.baudrate = 1000000
+        enter_mac_return = self.data_queue.get(timeout = timeout).data
+        if enter_mac_return != mac:
+            return SMCom.SMCOM_STATUS_FAIL
+        # try:
         if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
             return write_ret
-        #self.ser.baudrate = 1000000
-        packet = self.data_queue.get(timeout = 10)
-        #Verify packet!
-        if(packet.verify_packet(message_id = SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, transmitter_id = id) == False):
-            return "invalid device entered fu-mode"
 
         print("Device entered firmware updater mode")
         id = 12 # This is predefined id for bootloader
         no_packets = len(packets)
+        print(len(packets)) # should be 159 !!!
 
-        #parse mac as list
-        start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac) ]
-
+        start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac)]
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_START.value, start_message, len(start_message))
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, [], 0)
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [], 0)
+        
+        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+            return write_ret
+        
+        read_ret = self.data_queue.get(timeout = timeout).data
+        start_mac_return = read_ret[1:]
+        status = read_ret[0]
 
+        if mac != start_mac_return and status != WIRED_MESSAGE_STATUS.SUCCESS.value:
+            return SMCom.SMCOM_STATUS_FAIL
+            
+        for packet_no in range(no_packets):
+            retry = 0
+            wired_packet_no = packet_no + 1
+            success = False
+            data_packet = [*tuple(packets[packet_no]), *tuple(mac), *tuple(wired_packet_no.to_bytes(2, "little"))]
+            print(data_packet)
+            while retry < WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET:
+                retry += 1
+                write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, data_packet, len(data_packet))
+                print(len(data_packet)) #should be 232 + 8
 
+                resp_msg_data = self.data_queue.get(timeout = timeout).data
+                print(f"retry: {retry} for packet_no {wired_packet_no}")
+                if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                    print(read_ret)
+                    continue
+                
+                read_ret = resp_msg_data[0]
+                packet_mac_return = resp_msg_data[1:]     # resp data[0] is wired status and 1: is mac address returned wrt the msg
+                if mac != packet_mac_return and read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                    print(read_ret)
+                    continue
 
+                success = True
+                print(f"packet {wired_packet_no} success")
+                break
 
-        pass
+            if not success:
+                return SMCom.SMCOM_STATUS_FAIL
+                
+        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [*tuple(mac)], len(mac))
+        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+            return write_ret
+
+        resp_end = self.data_queue.get(timeout = timeout).data
+        read_ret = resp_end[0]
+        end_mac_return = resp_end[1:]
+        if mac != end_mac_return and read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+            return SMCom.SMCOM_STATUS_FAIL
+        time.sleep(10)
+        print("Firmware Updated!!!")
+        self.ser.baudrate = 115200
+        # except:
+        #     print("error")
+        # finally:
+        #     self.ser.baudrate = 115200
     
         
     MESSAGES_SENSEWAY_WIRED = \
