@@ -87,6 +87,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         creates and returns a wired(inherited from SMCom<SMCOM_PUBLIC>)
         """
         super().__init__(device_id)
+        self.transmitter_id = id
         
         self.ser = serial.Serial(PORT, BAUD_RATE)
 
@@ -95,8 +96,8 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.data_queue = queue.Queue()
         self.mutex = threading.Lock()
         self.mutex_timeout = 10
-        self.version = self.get_version(15)
-        self.mac_address = self.get_mac_address(15)
+        # self.version = self.get_version(15)
+        # self.mac_address = self.get_mac_address(15)
         self.continue_thread = True
         
         self.listener_thread = threading.Thread(target=self.__thread_func__, daemon=True)
@@ -108,7 +109,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
         while self.continue_thread:
             self.listener()
             time.sleep(0.01)
-            #time.sleep(0.5) ## bug fix için
         print("Thread closed!")
         
     def __write__(self, buffer, length):
@@ -126,7 +126,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         if(self.mutex.acquire(blocking=True, timeout=self.mutex_timeout)):
             self.ser.write(buffer)
-            self.ser.flush()
+            # self.ser.flush()
             self.mutex.release()
             return SMCom.SMCOM_STATUS_SUCCESS
         else:
@@ -138,15 +138,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
         if(status != SMCom.SMCOM_STATUS_SUCCESS):
             print("Error occured!")
             return
-        temp_packet = PySMComPacket()#SMCom.pySMCOM_PUBLIC()
-        #print(id(temp_packet))
+        temp_packet = PySMComPacket()
         temp_packet.data = packet.data
         temp_packet.message_id = packet.message_id			   
         temp_packet.receiver_id = packet.receiver_id		 
         temp_packet.transmitter_id = packet.transmitter_id
         temp_packet.message_type = packet.message_type  
         temp_packet.data_len = packet.data_len
-        #print("__rx invoked, putting:",temp_packet.data,temp_packet.data_len)
         self.data_queue.put(temp_packet)
 
     def __tx_callback__(self, event, status, packet):
@@ -179,22 +177,30 @@ class Wired(SMCom.SMCOM_PUBLIC):
             return None
 
     def get_version(self, id, timeout = 3):
-        #Check the write return maybe we get error
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.GET_VERSION.value, [], 0)
         if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
             return write_ret
-        #Check also queue data receiver id!, maybe not desired message
-        SMCom_version = self.data_queue.get(timeout = timeout).data
-    
+        packet = self.data_queue.get(timeout = timeout)
+        SMCom_version = packet.data
+        rec_id = packet.receiver_id
+        # print(rec_id)
+        # if rec_id != id:
+        #     return SMCom.SMCOM_STATUS_FAIL
         version = f"{SMCom_version[2]}.{SMCom_version[1]}.{SMCom_version[0]}"
         return version
     
     def get_mac_address(self, id, timeout = 3):
-        #Check the write return maybe we get error
-        self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
-        #Check also queue data receiver id!, maybe not desired message
+        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
+        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+            return write_ret
 
-        data = self.data_queue.get(timeout = timeout).data
+        packet = self.data_queue.get(timeout = timeout)
+        # rec_id = packet.receiver_id
+
+        # if rec_id != self.transmitter_id:
+        #     return SMCom.SMCOM_STATUS_FAIL
+
+        data = packet.data
         data = tuple(data[:-3])
         return "%02X:%02X:%02X:%02X:%02X:%02X"%data
             
@@ -263,12 +269,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         return measurement_data
 
-    def measure(self,id,acc, freq, sample_size, timeout=10):
-        if(self.start_batch_measurement(id,acc,freq,sample_size,notify_measurement_end=True) == True):
+    def measure(self, id, acc, freq, sample_size, timeout=10):
+        if(self.start_batch_measurement(id, acc, freq, sample_size, notify_measurement_end=True) == True):
             coef = self.accelerometer_coefficients[acc_range_dict[acc]]
             return self.read_measurement(id,sample_size,coefficient= coef,timeout = timeout)
-
-        return None
+        else:
+            print("Measurement failed")
+            return None
     
     def get_all_telemetry(self, id, timeout = 30):
         #Check write!
