@@ -5,7 +5,8 @@ import time
 import queue
 import atexit
 from enum import Enum
-from sys import argv
+from sys import argv, stdout
+from argparse import ArgumentParser
 
 BAUD_RATE = 115200
 PORT = "/dev/ttyUSB0"
@@ -473,122 +474,45 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.continue_thread = False
         self.ser.close()
 
-def parse_args():
-    global PORT
-    def update_help():
-        print(" Usage [--port] PORT [--binfile] FILEADR",
-              "or you can just use [--update PORT FILEADR]\n",
-              "Update firmware of the device connected to given port with given bin file\n\n"
-              "Positional arguments:\n",
-              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
-              "FILEADR\t\taddress of the binary file containing the firmware update\n")
+def parse_arg():
+    parser = ArgumentParser(description = "SMCom wired library to get measurements and update firmware")
+    sub_parsers = parser.add_subparsers(help = 'sub-command help')
+    update_parser = sub_parsers.add_parser('update', help = 'Update firmware of the device connected to given port with given bin file')
+    update_parser.add_argument('port', metavar = 'PORT', type = str, help = "port address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)")
+    update_parser.add_argument('binfile', metavar = 'FILE', type = str, help = "address of the binary file containing the firmware update")
 
-    def measure_help():
-        print(" Usage [--port] PORT [--acc] ACC [--freq] FREQ [--size] SMPSIZE [--outfile] FILEADR [--telem] TELEMFLAG",
-              "or you can just use [--measure PORT ACC FREQ SMPSIZE FILEADR TELEM]\n\n",
-              "Positional arguments:\n",
-              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
-              "ACC\t\t\tacceleration range: Possible args: 2G, 4G, 8G, 16G\n",
-              "FREQ\t\t\tsampling frequency: Possible args: 800, 1600, 3200, 6400, 12800\n",
-              "SMPSIZE\t\tsampling size: Number of samples\n",
-              "FILEADR\t\toutput file address which measurement data will be written\n",
-              "TELEMFLAG\t\tcan be notset or 1. if 1, telemetries will be written at the beginning of the file\n"
-        )
+    update_parser = sub_parsers.add_parser('measure', help = 'Update firmware of the device connected to given port with given bin file')
+    update_parser.add_argument('port', metavar = 'PORT', action = 'store', type = str, help = "port address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)")
+    update_parser.add_argument('acc', metavar = 'ACC', action = 'store', type = str, help = "acceleration range: Possible args: 2G, 4G, 8G, 16G")
+    update_parser.add_argument('freq', metavar = 'FREQ', action = 'store', type = int, help = "sampling frequency: Possible args: 800, 1600, 3200, 6400, 12800")
+    update_parser.add_argument('smpsize', metavar = 'SMPSIZE', action = 'store', type = int, help = "sampling size: Number of samples")
+    update_parser.add_argument('--fileadr', metavar = '', action = 'store', type = str, default = stdout, help = "output file address which measurement data will be written")
+    update_parser.add_argument('--telem', action = 'store_true', help = "can be set or notset. if set, telemetries will be written at the beginning of the file")
+    data = parser.parse_args()
+    if argv[1] == 'update':
+        dev = Wired(port = data.port)
+        dev.firmware_update(dev.mac_address, data.fileadr)
+    elif argv[1] == 'measure':
+        dev = Wired(port = data.port)
+        meas = dev.measure(255, data.acc, data.freq, data.smpsize)
+        ls = []
+        for i in range(len(meas[0])*3):
+            ls.append(meas[i%3][i//3])
+        terminal = False
+        if data.fileadr == stdout:
+            terminal = True
+            f = stdout
 
-    if len(argv) == 1 or argv[1] == '-h' or argv[1] == '--help':
-        print(" Usage [-h or --help] [--update [update_args]] [--measure [measure_args]]\n\n",
-              "To get help about one of the function use [--function -h]: (ex. [--update -h])\n")
-
-    elif argv[1] == "--update":
-        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"): 
-            update_help()
-        else:
-            port_flag = False
-            bin_flag = False
-            if len(argv) == 4:
-                PORT, FILEADR = argv[2:4]
-                bin_flag, port_flag = True, True
-            else:
-                i = 0
-                while i < len(argv):
-                    if argv[i] == "--port":
-                        if len(argv) > i:
-                            PORT = argv[i+1]
-                            i += 1
-                            port_flag = True
-                    elif argv[i] == "--binfile":
-                        if len(argv) > i:
-                            FILEADR = argv[i+1]
-                            i += 1
-                            bin_flag = True
-                    i += 1
-            if bin_flag and port_flag:
-                dev = Wired(port = PORT)
-                dev.firmware_update(dev.mac_address, FILEADR)
-            else:
-                update_help()
-    
-    elif argv[1] == "--measure":
-        telemflag = False
-        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"):
-            measure_help()
-        else:
-            flags = [False] * 5
-            if len(argv) == 7 or len(argv) == 8:
-                PORT, ACC, FREQ, SMPSIZE, FILEADR = argv[2:7]
-                flags = [True] * 5
-                if len(argv) == 8:
-                    if argv[7] == '1' or 'True':
-                        telemflag = True
-            else:
-                i = 0
-                while i < len(argv):
-                    if argv[i] == "--port":
-                        if len(argv) > i:
-                            PORT = argv[i+1]
-                            i += 1
-                            flags[0] = True
-                    elif argv[i] == "--acc":
-                        if len(argv) > i:
-                            ACC = argv[i+1]
-                            i += 1
-                            flags[1] = True
-                    elif argv[i] == "--freq":
-                        if len(argv) > i:
-                            FREQ = argv[i+1]
-                            i += 1
-                            flags[2] = True
-                    elif argv[i] == "--size":
-                        if len(argv) > i:
-                            SMPSIZE = argv[i+1]
-                            i += 1
-                            flags[3] = True
-                    elif argv[i] == "--outfile":
-                        if len(argv) > i:
-                            PORT = argv[i+1]
-                            i += 1
-                            flags[4] = True
-                    elif argv[i] == "--telem":
-                        if len(argv) > i:
-                            if argv[i+1] == '1' or 'True':
-                                telemflag = True
-                    i += 1
-            if flags == [True] * 5:
-                dev = Wired(port = PORT)
-                meas = dev.measure(255, ACC, int(FREQ), int(SMPSIZE))
-                ls = []
-                for i in range(len(meas[0])*3):
-                    ls.append(meas[i%3][i//3])
-                f = open(FILEADR, "w")
-                if telemflag:
-                    telems = dev.get_all_telemetry(0xFF)
-                    for i in telems.keys():
-                        print(f"{i} : {telems[i]}", file = f)
-                for i in ls:
-                    print(i, file = f)
-                f.close()
-            else:
-                measure_help()
+        if not terminal: 
+            f = open(data.fileadr, "w")
+        if data.telem:
+            telems = dev.get_all_telemetry(0xFF)
+            for i in telems.keys():
+                print(f"{i} : {telems[i]}", file = f)
+        for i in ls:
+            print(i, file = f)
+        if not terminal:
+            f.close()
 
 if __name__ == "__main__":
-    parse_args()
+    parse_arg()
