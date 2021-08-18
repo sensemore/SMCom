@@ -12,7 +12,7 @@
 namespace py = pybind11;
 
 // compile code :
-// c++ -shared -fPIC $(python3 -m pybind11 --includes) config.cpp SMCom.cpp public_test.cpp -o SMCom$(python3-config --extension-suffix)
+// c++ -shared -fPIC $(python3 -m pybind11 --includes) config.cpp SMCom.cpp -o SMCom$(python3-config --extension-suffix)
 
 class pySMCOM_PUBLIC{
     public:

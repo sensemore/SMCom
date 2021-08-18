@@ -32,7 +32,7 @@
 #define SMCOM_PATCH_LEVEL__ 	1
 #define SMCOM_VERSION_STRING	"1.0.1"
 #define SMCOM_VERSION (SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__
-
+#define MAX_RETRY_FOR_WRITE 5
 /*
 	Some configurations macros before including this class
 	-SMCOM REQUEST-RESPONSE FLAG

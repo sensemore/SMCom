@@ -441,7 +441,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
             end_mac_return = resp_end[1:]
             if mac != end_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
                 return SMCom.SMCOM_STATUS_FAIL
-            time.sleep(10)
+            time.sleep(12)
             self.ser.baudrate = 115200
             print("Firmware Updated to version:", self.get_version(255))
         except:
