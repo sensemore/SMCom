@@ -555,15 +555,33 @@ SMCom_Status_t SMCom<T>::common_start_write_queue(){
 	//Start sending start byte and head sequence
 	uint8_t head = MESSAGE_START;
 	last_crc = get_crc_ibm(&head,1,last_crc);
-	ret = __write__(&head,1);
-		if(ret != SMCOM_STATUS_SUCCESS) return ret;
+
+	uint8_t retry = 0;
+	while(true)
+	{
+		ret = __write__(&head,1);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			return ret;
+		retry++;	
+	}
 
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
 	last_crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),last_crc);
-	ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret != SMCOM_STATUS_SUCCESS) return ret;
+	
+	retry = 0;
+	while(true)
+	{
+		ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			return ret;
+		retry++;	
+	}
 
 	txflag.rx_tx_id_flag = 1;
 
@@ -589,8 +607,17 @@ SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t le
 
 	//Data sequence
 	last_crc = get_crc_ibm(buffer,len,last_crc);
-	ret = __write__(buffer,len);
-	if(ret != SMCOM_STATUS_SUCCESS) return ret;
+
+	uint8_t retry = 0;
+	while(true)
+	{
+		ret = __write__(buffer,len);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			return ret;
+		retry++;	
+	}
 
 	txflag.data_flag = 1;
 
@@ -607,7 +634,19 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 
 
 	uint8_t last_bytes[3] = {(uint8_t)((last_crc>>8)&0x00FF), (uint8_t)(last_crc & 0x00FF), MESSAGE_END};
-	ret = __write__(last_bytes,3);
+	
+	uint8_t retry = 0;
+	while(true)
+	{
+		ret = __write__(last_bytes,3);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			break;
+		retry++;	
+	}
+	
+	// ret = __write__(last_bytes,3);
 	txflag.crc_flag = 1;
 
 
@@ -672,7 +711,19 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 
 	txflag.crc_flag = 1;
 
-	return __write__(tx_buffer,txit);
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+	uint8_t retry = 0;
+	while(true)
+	{
+		ret = __write__(tx_buffer,txit);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			break;
+		retry++;	
+	}
+
+	return ret;
 }
 
 
@@ -699,23 +750,49 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	//Start sequence
 	uint8_t head = MESSAGE_START;
 	crc = get_crc_ibm(&head,1,crc);
-	ret = __write__(&head,1);
-		if(ret != SMCOM_STATUS_SUCCESS) return ret;
+	
+	uint8_t retry = 0;
+	while(true)
+	{
+		ret = __write__(&head,1);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			return ret;
+		retry++;	
+	}
 
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
 	crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),crc);
-	ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret != SMCOM_STATUS_SUCCESS) return ret;
+	
+	retry = 0;
+	while(true)
+	{
+		ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			return ret;
+		retry++;	
+	}
 
 	txflag.rx_tx_id_flag = 1;
 
 	if(len){
 		//Data sequence
 		crc = get_crc_ibm(buffer,len,crc);
-		ret = __write__(buffer,len);
-		if(ret != SMCOM_STATUS_SUCCESS) return ret;	
+		retry = 0;
+		while(true)
+		{
+			ret = __write__(buffer,len);
+			if(ret == SMCOM_STATUS_SUCCESS) 
+				break;
+			if(retry >= MAX_RETRY_FOR_WRITE)
+				return ret;
+			retry++;	
+		}
 	}
 	
 	if(packet_size > possible_packet_size){
@@ -723,8 +800,16 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 		uint16_t padding = (packet_size - possible_packet_size);
 		while(padding--){
 			uint8_t d = 0;
-			ret = __write__(&d,1);
-			if(ret != SMCOM_STATUS_SUCCESS) return ret;
+			retry = 0;
+			while(true)
+			{
+				ret = __write__(&d,1);
+				if(ret == SMCOM_STATUS_SUCCESS) 
+					break;
+				if(retry >= MAX_RETRY_FOR_WRITE)
+					return ret;
+				retry++;	
+			}
 		}
 	}
 	txflag.data_flag = 1;
@@ -733,7 +818,19 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	uint8_t last_bytes[3] = {(uint8_t)((crc>>8)&0x00FF), (uint8_t)(crc & 0x00FF), MESSAGE_END};
 
 	txflag.crc_flag = 1;
-	return __write__(last_bytes,3);
+
+	retry = 0;
+	while(true)
+	{
+		ret = __write__(last_bytes,3);
+		if(ret == SMCOM_STATUS_SUCCESS) 
+			break;
+		if(retry >= MAX_RETRY_FOR_WRITE)
+			break;
+		retry++;	
+	}
+
+	return ret;
 }
 
 
