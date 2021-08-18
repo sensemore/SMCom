@@ -5,9 +5,12 @@ import time
 import queue
 import atexit
 from enum import Enum
+from sys import argv
+from os import system
 
 BAUD_RATE = 115200
-
+PORT = "/dev/ttyUSB0"
+WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET = 5
 
 class SMCOM_WIRED_MESSAGES(Enum):
     #------------- Bootloader Messages ---------------- 
@@ -56,7 +59,6 @@ sampling_frequency_dict = {
     "12800":9
 }
 
-
 class PySMComPacket:
     data_len = 0			    
     receiver_id = 0		    
@@ -81,29 +83,33 @@ class PySMComPacket:
 class Wired(SMCom.SMCOM_PUBLIC):
     accelerometer_coefficients= [(2*2)/(1<<16), (2*2)/(1<<16), (4*2)/(1<<16), (8*2)/(1<<16), (16*2)/(1<<16)]
 
-    def __init__(self, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
+    def __init__(self, port = PORT, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
+        """
+        Takes rx_buffer_size, tx_buffer_size and transmitter_id as arguments; 
+        creates and returns a wired(inherited from SMCom<SMCOM_PUBLIC>)
+        """
         super().__init__(device_id)
+        self.transmitter_id = id
         
-        self.ser = serial.Serial('/dev/ttyUSB0', BAUD_RATE)
+        self.ser = serial.Serial(port, BAUD_RATE)
 
-        atexit.register(self.__cleanup)
+        atexit.register(self.__del__)
         
         self.data_queue = queue.Queue()
         self.mutex = threading.Lock()
         self.mutex_timeout = 10
-
         self.continue_thread = True
         
         self.listener_thread = threading.Thread(target=self.__thread_func__, daemon=True)
         self.listener_thread.start()
 
-        print("Constuctor called !")
+        self.version = self.get_version(15)
+        self.mac_address = self.get_mac_address(15)
 
     def __thread_func__(self):
         while self.continue_thread:
             self.listener()
             time.sleep(0.01)
-            #time.sleep(0.5) ## bug fix için
         print("Thread closed!")
         
     def __write__(self, buffer, length):
@@ -119,8 +125,9 @@ class Wired(SMCom.SMCOM_PUBLIC):
             elif type(buffer[0]) == str:
                 buffer = bytes("".join(buffer), "utf-8")
 
-        if(self.mutex.acquire(blocking=True,timeout=self.mutex_timeout)):
+        if(self.mutex.acquire(blocking=True, timeout=self.mutex_timeout)):
             self.ser.write(buffer)
+            # self.ser.flush()
             self.mutex.release()
             return SMCom.SMCOM_STATUS_SUCCESS
         else:
@@ -132,15 +139,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
         if(status != SMCom.SMCOM_STATUS_SUCCESS):
             print("Error occured!")
             return
-        temp_packet = PySMComPacket()#SMCom.pySMCOM_PUBLIC()
-        #print(id(temp_packet))
+        temp_packet = PySMComPacket()
         temp_packet.data = packet.data
         temp_packet.message_id = packet.message_id			   
         temp_packet.receiver_id = packet.receiver_id		 
         temp_packet.transmitter_id = packet.transmitter_id
         temp_packet.message_type = packet.message_type  
         temp_packet.data_len = packet.data_len
-        #print("__rx invoked, putting:",temp_packet.data,temp_packet.data_len)
         self.data_queue.put(temp_packet)
 
     def __tx_callback__(self, event, status, packet):
@@ -172,35 +177,55 @@ class Wired(SMCom.SMCOM_PUBLIC):
         else:
             return None
 
-    def dirty_listener(self,wait_packet_no):
-        return
-        while(self.data_queue.qsize() == 0):
-            self.listener()
-        
-        while(wait_packet_no != 0):
-            self.listener()
-            wait_packet_no -= 1
-
     def get_version(self, id, timeout = 3):
-        #Check the write return maybe we get error
+        """
+        Takes receiver id and timeout(default is 3) as argument and returns version of the device
+        in format (MAJOR.MINOR.PATCH)(Ex. 1.0.12) with given id (15 or 255 are reserved as public id)
+        """
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.GET_VERSION.value, [], 0)
         if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
             return write_ret
-        #Check also queue data receiver id!, maybe not desired message
-        SMCom_version = self.data_queue.get(timeout = timeout).data
-    
+        packet = self.data_queue.get(timeout = timeout)
+        SMCom_version = packet.data
+        rec_id = packet.receiver_id
+        # print(rec_id)
+        # if rec_id != id:
+        #     return SMCom.SMCOM_STATUS_FAIL
         version = f"{SMCom_version[2]}.{SMCom_version[1]}.{SMCom_version[0]}"
         return version
     
-    def get_mac_adress(self, id, timeout = 3):
-        #Check the write return maybe we get error
-        self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
-        #Check also queue data receiver id!, maybe not desired message
+    def get_mac_address(self, id, timeout = 3):
+        """
+        Takes receiver id as argument and returns mac address of the device with given id as string in format
+        (XX:XX:XX:XX:XX:XX) (15 or 255 are reserved as public id).
+        """
+        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
+        if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+            return write_ret
 
-        data = self.data_queue.get(timeout = timeout).data
+        packet = self.data_queue.get(timeout = timeout)
+        # rec_id = packet.receiver_id
+
+        # if rec_id != self.transmitter_id:
+        #     return SMCom.SMCOM_STATUS_FAIL
+
+        data = packet.data
         data = tuple(data[:-3])
         return "%02X:%02X:%02X:%02X:%02X:%02X"%data
-            
+
+    def assign_new_id(self, mac_address, id):
+        """
+        Takes mac adress and id to be assigned to the given mac address as arguments assigns the 
+        receiver id to the device which has mac address same as given and return None.
+        """
+        data = []
+        data.append(id)
+        mac_address = mac_address.split(':')
+        for i in range(len(mac_address)):
+            mac_address[i] = int(mac_address[i], base = 16)
+        data.extend(mac_address)
+        self.write(255, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_SET_NEW_ID, data, len(data))
+    
     def start_batch_measurement(self, id, acc, freq, sample_size, notify_measurement_end = True):
         if(sample_size <= 0 or sample_size >= 1000000 or (str(freq) not in sampling_frequency_dict.keys()) or (str(acc) not in acc_range_dict.keys()) ):
             #Return arg error here
@@ -218,9 +243,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         if(notify_measurement_end):
             #calculate end amount and give also additional time
             expected_timeout = sample_size/freq + (sample_size*0.1)
-            #self.dirty_listener(1)
             data_packet = self.data_queue.get(timeout = expected_timeout)
-            print("measurement ended:",data_packet.data[0],data_packet.data[0]==WIRED_MESSAGE_STATUS.SUCCESS.value,WIRED_MESSAGE_STATUS.SUCCESS.value)
             return (data_packet.data[0] == WIRED_MESSAGE_STATUS.SUCCESS.value)
         
         return True
@@ -240,7 +263,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         from math import ceil
         expected_packets = ceil(data_len/240)
-        print("Exptected packets",expected_packets)
         while(expected_packets != 0):
             packet = self.data_queue.get(timeout = 10)
             expected_packets -= 1
@@ -266,13 +288,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         return measurement_data
 
-    
-    def measure(self,id,acc, freq, sample_size, timeout=10):
-        if(self.start_batch_measurement(id,acc,freq,sample_size,notify_measurement_end=True) == True):
+    def measure(self, id, acc, freq, sample_size, timeout=10):
+        if(self.start_batch_measurement(id, acc, freq, sample_size, notify_measurement_end=True) == True):
             coef = self.accelerometer_coefficients[acc_range_dict[acc]]
             return self.read_measurement(id,sample_size,coefficient= coef,timeout = timeout)
-
-        return None
+        else:
+            print("Measurement failed")
+            return None
     
     def get_all_telemetry(self, id, timeout = 30):
         #Check write!
@@ -286,81 +308,155 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         import struct
         def convert_byte_list_to_double(bl):
-            return struct.unpack('d',bytes(bl))
-        # double clearance[3];
-        # double crest[3];
-        # double grms[3];
-        # double kurtosis[3];
-        # double skewness[3];
-        # //Included in v1.0.9
-        # double vrms[3];
-        # double peak[3];
-        # double sum[3];
-        # //Included in v1.0.13
-        # double peak_to_peak[3];
+            return struct.unpack('d',bytes(bl))[0]
 
-    
-        clearance = [   convert_byte_list_to_double(telemetries[0:8]),
-                        convert_byte_list_to_double(telemetries[8:16]),
-                        convert_byte_list_to_double(telemetries[16:24])]
-    
+        start = 0
+        def byte_list_to_double_list(bl):
+            nonlocal start
+            dl = [  convert_byte_list_to_double(bl[start:start+8]),
+                    convert_byte_list_to_double(bl[start+8:start+16]),
+                    convert_byte_list_to_double(bl[start+16:start+24])]
+            start += 8
+            return dl
+        major, minor, patch = self.version.split('.')
+        
+        clearance = byte_list_to_double_list(telemetries)
+        crest = byte_list_to_double_list(telemetries)
+        grms = byte_list_to_double_list(telemetries)
+        kurtosis = byte_list_to_double_list(telemetries)
+        skewness = byte_list_to_double_list(telemetries)
 
-        telemetries = {
+        telems = {
             "temperature":temperature/100,
             "calibrated_frequency":calibrated_frequency,
             "clearance":clearance,
+            "crest":crest,
+            "grms":grms,
+            "kurtosis":kurtosis,
+            "skewness":skewness
         }
 
-        return telemetries
+        if int(patch) >= 9:
+            vrms = byte_list_to_double_list(telemetries)
+            peak = byte_list_to_double_list(telemetries)
+            sum = byte_list_to_double_list(telemetries)
+            telems["vrms"] = vrms
+            telems["peak"] = peak
+            telems["sum"] = sum
+            
+        if int(patch) >= 13:
+            peak_to_peak = byte_list_to_double_list(telemetries)
+            telems["peak_to_peak"] = peak_to_peak
 
-    def firmware_update(self,id,mac,bin_file,timeout = 10):
-        #Bin dosyası okunup bir list içine alınacak ve list içinde ayrı listelerde paket paket datalar olacak
-        #Max data boyutu 240 byte olmalı
+        return telems
+
+    def firmware_update(self, mac, bin_file_address, receiver_id = 255, timeout = 10):
+        """
+        Takes receiver_id, mac_address, address of binary file, and timeout(default 10) and return SMCom_Status_t 
+        or WIRED_MESSAGE_STATUS type as int.
+        """
+        bin_file = open(bin_file_address, "rb")
+        packets = []
+
+        while True:
+            temp = bin_file.read(240)
+            if temp == b'':
+                break
+            packets.append(list(temp))
+        packets[-1] += [0] * (240 - len(packets[-1]))
         
-        packets = [] #fill
-        bin_file_size = 0 #fill
-        #Read file here
-
-
+        bin_file_size = 240*(len(packets)-1) + len(packets[-1])
+        if bin_file_size == 0:
+            print("Empty File")
+            return
         if(isinstance(mac,str)):
             mac = [int(ff,16) for ff in mac.split(':')]    
 
         print("Device mac:",mac)
         enter_message = mac
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, enter_message, len(enter_message))
-        if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
-            return write_ret
-        #self.ser.baudrate = 1000000
-        packet = self.data_queue.get(timeout = 10)
-        #Verify packet!
-        if(packet.verify_packet(message_id = SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, transmitter_id = id) == False):
-            return "invalid device entered fu-mode"
-
-        print("Device entered firmware updater mode")
-        id = 12 # This is predefined id for bootloader
-        no_packets = len(packets)
-
-        #parse mac as list
-        start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac) ]
-
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_START.value, start_message, len(start_message))
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, [], 0)
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [], 0)
-
-
-
-
-        pass
-    
         
-    MESSAGES_SENSEWAY_WIRED = \
-    [
+        self.ser.baudrate = 1000000
+        enter_mac_return = self.data_queue.get(timeout = timeout).data
+        if enter_mac_return != mac:
+            return SMCom.SMCOM_STATUS_FAIL
+        try:
+            if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
+                return write_ret
+
+            print("Device entered firmware updater mode")
+            bootloader_id = 12 # This is predefined id for bootloader
+            no_packets = len(packets) - 1
+
+            start_message = [*tuple(bin_file_size.to_bytes(4, "little")),*tuple(no_packets.to_bytes(4, "little")), *tuple(mac)]
+            write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_START.value, start_message, len(start_message))
+            
+            if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                return write_ret
+            
+            read_ret = self.data_queue.get(timeout = timeout).data
+            start_mac_return = read_ret[1:]
+            status = read_ret[0]
+
+            if mac != start_mac_return or status != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                return SMCom.SMCOM_STATUS_FAIL
+            
+            for packet_no in range(no_packets + 1):
+                retry = 0
+                wired_packet_no = packet_no + 1
+                success = False
+                data_packet = [*tuple(packets[packet_no]), *tuple(mac), *tuple(wired_packet_no.to_bytes(2, "little"))]
+                while retry < WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET:
+                    retry += 1
+                    write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, data_packet, len(data_packet))
+                    resp_msg_data = self.data_queue.get(timeout = timeout).data
+                    print(f"retry: {retry} for packet_no {wired_packet_no}")
+                    if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                        print("write error:",write_ret)
+                        continue
+                    if packet_no == 158:
+                        print(f"packet {wired_packet_no}:", data_packet)
+                    read_ret = resp_msg_data[0]
+                    packet_mac_return = resp_msg_data[1:7]     # resp data[0] is wired status and 1: is mac address returned wrt the msg
+                    ret_packet_no = resp_msg_data[7:]
+                    print(ret_packet_no)
+                    if mac != packet_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                        print("data error:",read_ret)
+                        continue
+
+                    success = True
+                    print(f"packet {wired_packet_no} success")
+                    break
+
+                if not success:
+                    return SMCom.SMCOM_STATUS_FAIL
+
+            #Data transmission ended successfully
+                    
+            write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET_END.value, [*tuple(mac)], len(mac))
+            if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
+                return write_ret
+
+            resp_end = self.data_queue.get(timeout = timeout).data
+            read_ret = resp_end[0]
+            print(read_ret)
+            end_mac_return = resp_end[1:]
+            if mac != end_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
+                return SMCom.SMCOM_STATUS_FAIL
+            time.sleep(5)
+            print("Firmware Updated to version:", self.get_version(receiver_id))
+        except:
+            print("An error occurred while firmware update")
+        finally:
+            self.ser.baudrate = 115200
+    
+    MESSAGES_SENSEWAY_WIRED = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
         ("GET_VERSION",                     get_version),
-        ("AUTO_ADDRESSING_INIT",            0),
+        ("AUTO_ADDRESSING_INIT",            get_mac_address),
         ("AUTO_ADDRESSING_SET_NEW_ID",      0),
-        ("START_BATCH_MEASUREMENT",         0),
-        ("GET_BATCH_MEASUREMENT",           0),
+        ("START_BATCH_MEASUREMENT",         start_batch_measurement),
+        ("GET_BATCH_MEASUREMENT",           read_measurement),
         ("GET_CLEARANCE",                   0),
         ("GET_CREST",                       0),
         ("GET_GRMS",                        0),
@@ -368,27 +464,134 @@ class Wired(SMCom.SMCOM_PUBLIC):
         ("GET_SKEWNESS",                    0),
         ("GET_BATCH_MEASUREMENT_CHUNK",     0),
         ("AUTO_ADDRESSING_INTEGRITY_CHECK", 0),
-        ("GET_ALL_TELEMETRY",               0),
+        ("GET_ALL_TELEMETRY",               get_all_telemetry),
         ("GET_VRMS",                        0),
         ("GET_PEAK",                        0),
         ("GET_SUM",                         0)
     ]
 
     def __del__(self):
-        print("dest called")
         self.continue_thread = False
         self.ser.close()
 
-    def __cleanup(self):
-        print("Closing serial port!")
-        self.continue_thread = False
-        self.ser.close()
+def parse_args():
+    global PORT
+    def update_help():
+        print(" Usage [--port] PORT [--binfile] FILEADR",
+              "or you can just use [--update PORT FILEADR]\n",
+              "Update firmware of the device connected to given port with given bin file\n\n"
+              "Positional arguments:\n",
+              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
+              "FILEADR\t\taddress of the binary file containing the firmware update\n")
 
+    def measure_help():
+        print(" Usage [--port] PORT [--acc] ACC [--freq] FREQ [--size] SMPSIZE [--outfile] FILEADR [--telem] TELEMFLAG",
+              "or you can just use [--measure PORT ACC FREQ SMPSIZE FILEADR TELEM]\n\n",
+              "Positional arguments:\n",
+              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
+              "ACC\t\t\tacceleration range: Possible args: 2G, 4G, 8G, 16G\n",
+              "FREQ\t\t\tsampling frequency: Possible args: 800, 1600, 3200, 6400, 12800\n",
+              "SMPSIZE\t\tsampling size: Number of samples\n",
+              "FILEADR\t\toutput file address which measurement data will be written\n",
+              "TELEMFLAG\t\tcan be notset or 1. if 1, telemetries will be written at the beginning of the file\n"
+        )
 
+    if len(argv) == 1 or argv[1] == '-h' or argv[1] == '--help':
+        print(" Usage [-h or --help] [--update [update_args]] [--measure [measure_args]]\n\n",
+              "To get help about one of the function use [--function -h]: (ex. [--update -h])\n")
 
+    elif argv[1] == "--update":
+        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"): 
+            update_help()
+        else:
+            port_flag = False
+            bin_flag = False
+            if len(argv) == 4:
+                PORT, FILEADR = argv[2:4]
+                bin_flag, port_flag = True, True
+            else:
+                i = 0
+                while i < len(argv):
+                    if argv[i] == "--port":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            port_flag = True
+                    elif argv[i] == "--binfile":
+                        if len(argv) > i:
+                            FILEADR = argv[i+1]
+                            i += 1
+                            bin_flag = True
+                    i += 1
+            if bin_flag and port_flag:
+                dev = Wired()
+                time.sleep(1)
+                dev.firmware_update(dev.mac_address, FILEADR)
+            else:
+                update_help()
+    
+    elif argv[1] == "--measure":
+        telemflag = False
+        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"):
+            measure_help()
+        else:
+            flags = [False] * 5
+            if len(argv) == 7 or len(argv) == 8:
+                PORT, ACC, FREQ, SMPSIZE, FILEADR = argv[2:7]
+                flags = [True] * 5
+                if len(argv) == 8:
+                    if argv[7] == '1' or 'True':
+                        telemflag = True
+            else:
+                i = 0
+                while i < len(argv):
+                    if argv[i] == "--port":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            flags[0] = True
+                    elif argv[i] == "--acc":
+                        if len(argv) > i:
+                            ACC = argv[i+1]
+                            i += 1
+                            flags[1] = True
+                    elif argv[i] == "--freq":
+                        if len(argv) > i:
+                            FREQ = argv[i+1]
+                            i += 1
+                            flags[2] = True
+                    elif argv[i] == "--size":
+                        if len(argv) > i:
+                            SMPSIZE = argv[i+1]
+                            i += 1
+                            flags[3] = True
+                    elif argv[i] == "--outfile":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            flags[4] = True
+                    elif argv[i] == "--telem":
+                        if len(argv) > i:
+                            if argv[i+1] == '1' or 'True':
+                                telemflag = True
+                    i += 1
+            if flags == [True] * 5:
+                dev = Wired()
+                time.sleep(1)
+                meas = dev.measure(255, ACC, int(FREQ), int(SMPSIZE))
+                ls = []
+                for i in range(len(meas[0])*3):
+                    ls.append(meas[i%3][i//3])
+                f = open(FILEADR, "w")
+                if telemflag:
+                    telems = dev.get_all_telemetry(0xFF)
+                    for i in telems.keys():
+                        print(f"{i} : {telems[i]}", file = f)
+                for i in ls:
+                    print(i, file = f)
+                f.close()
+            else:
+                measure_help()
 
 if __name__ == "__main__":
-    pass
-
-
-
+    parse_args()
