@@ -485,14 +485,15 @@ def parse_args():
               "FILEADR\t\taddress of the binary file containing the firmware update\n")
 
     def measure_help():
-        print(" Usage [--port] PORT [--acc] ACC [--freq] FREQ [--size] SMPSIZE [--outfile] FILEADR",
-              "or you can just use [--measure PORT ACC FREQ SMPSIZE FILEADR]\n\n",
+        print(" Usage [--port] PORT [--acc] ACC [--freq] FREQ [--size] SMPSIZE [--outfile] FILEADR [--telem] TELEMFLAG",
+              "or you can just use [--measure PORT ACC FREQ SMPSIZE FILEADR TELEM]\n\n",
               "Positional arguments:\n",
               "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
               "ACC\t\t\tacceleration range: Possible args: 2G, 4G, 8G, 16G\n",
               "FREQ\t\t\tsampling frequency: Possible args: 800, 1600, 3200, 6400, 12800\n",
               "SMPSIZE\t\tsampling size: Number of samples\n",
-              "FILEADR\t\toutput file address which measurement data will be written\n"
+              "FILEADR\t\toutput file address which measurement data will be written\n",
+              "TELEMFLAG\t\tcan be notset or 1. if 1, telemetries will be written at the beginning of the file\n"
         )
 
     if len(argv) == 1 or argv[1] == '-h' or argv[1] == '--help':
@@ -530,13 +531,17 @@ def parse_args():
                 update_help()
     
     elif argv[1] == "--measure":
+        telemflag = False
         if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"):
             measure_help()
         else:
             flags = [False] * 5
-            if len(argv) == 7:
+            if len(argv) == 7 or len(argv) == 8:
                 PORT, ACC, FREQ, SMPSIZE, FILEADR = argv[2:7]
                 flags = [True] * 5
+                if len(argv) == 8:
+                    if argv[7] == '1' or 'True':
+                        telemflag = True
             else:
                 i = 0
                 while i < len(argv):
@@ -565,6 +570,10 @@ def parse_args():
                             PORT = argv[i+1]
                             i += 1
                             flags[4] = True
+                    elif argv[i] == "--telem":
+                        if len(argv) > i:
+                            if argv[i+1] == '1' or 'True':
+                                telemflag = True
                     i += 1
             if flags == [True] * 5:
                 dev = Wired()
@@ -574,6 +583,10 @@ def parse_args():
                 for i in range(len(meas[0])*3):
                     ls.append(meas[i%3][i//3])
                 f = open(FILEADR, "w")
+                if telemflag:
+                    telems = dev.get_all_telemetry(0xFF)
+                    for i in telems.keys():
+                        print(f"{i} : {telems[i]}", file = f)
                 for i in ls:
                     print(i, file = f)
                 f.close()
