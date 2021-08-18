@@ -6,7 +6,6 @@ import queue
 import atexit
 from enum import Enum
 from sys import argv
-from os import system
 
 BAUD_RATE = 115200
 PORT = "/dev/ttyUSB0"
@@ -102,9 +101,10 @@ class Wired(SMCom.SMCOM_PUBLIC):
         
         self.listener_thread = threading.Thread(target=self.__thread_func__, daemon=True)
         self.listener_thread.start()
+        time.sleep(1)
 
-        self.version = self.get_version(15)
-        self.mac_address = self.get_mac_address(15)
+        self.mac_address = self.get_mac_address(255)
+        self.version = self.get_version(255)
 
     def __thread_func__(self):
         while self.continue_thread:
@@ -127,7 +127,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         if(self.mutex.acquire(blocking=True, timeout=self.mutex_timeout)):
             self.ser.write(buffer)
-            # self.ser.flush()
+            self.ser.flush()
             self.mutex.release()
             return SMCom.SMCOM_STATUS_SUCCESS
         else:
@@ -374,7 +374,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         print("Device mac:",mac)
         enter_message = mac
-        write_ret = self.write(id, SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, enter_message, len(enter_message))
+        write_ret = self.write(receiver_id, SMCOM_WIRED_MESSAGES.ENTER_FIRMWARE_UPDATER_MODE.value, enter_message, len(enter_message))
         
         self.ser.baudrate = 1000000
         enter_mac_return = self.data_queue.get(timeout = timeout).data
@@ -410,22 +410,21 @@ class Wired(SMCom.SMCOM_PUBLIC):
                     retry += 1
                     write_ret = self.write(bootloader_id, SMCOM_WIRED_MESSAGES.FIRMWARE_PACKET.value, data_packet, len(data_packet))
                     resp_msg_data = self.data_queue.get(timeout = timeout).data
-                    print(f"retry: {retry} for packet_no {wired_packet_no}")
+                    # print(f"retry: {retry} for packet_no {wired_packet_no}")
                     if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
-                        print("write error:",write_ret)
+                        # print("write error:",write_ret)
                         continue
-                    if packet_no == 158:
-                        print(f"packet {wired_packet_no}:", data_packet)
                     read_ret = resp_msg_data[0]
                     packet_mac_return = resp_msg_data[1:7]     # resp data[0] is wired status and 1: is mac address returned wrt the msg
                     ret_packet_no = resp_msg_data[7:]
-                    print(ret_packet_no)
+                    if ret_packet_no[0] != wired_packet_no:
+                        return SMCom.SMCOM_STATUS_FAIL
                     if mac != packet_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
-                        print("data error:",read_ret)
+                        # print("data error:",read_ret)
                         continue
 
                     success = True
-                    print(f"packet {wired_packet_no} success")
+                    # print(f"packet {wired_packet_no} success")
                     break
 
                 if not success:
@@ -439,12 +438,12 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
             resp_end = self.data_queue.get(timeout = timeout).data
             read_ret = resp_end[0]
-            print(read_ret)
             end_mac_return = resp_end[1:]
             if mac != end_mac_return or read_ret != WIRED_MESSAGE_STATUS.SUCCESS.value:
                 return SMCom.SMCOM_STATUS_FAIL
-            time.sleep(5)
-            print("Firmware Updated to version:", self.get_version(receiver_id))
+            time.sleep(10)
+            self.ser.baudrate = 115200
+            print("Firmware Updated to version:", self.get_version(255))
         except:
             print("An error occurred while firmware update")
         finally:
@@ -524,8 +523,7 @@ def parse_args():
                             bin_flag = True
                     i += 1
             if bin_flag and port_flag:
-                dev = Wired()
-                time.sleep(1)
+                dev = Wired(port = PORT)
                 dev.firmware_update(dev.mac_address, FILEADR)
             else:
                 update_help()
@@ -576,8 +574,7 @@ def parse_args():
                                 telemflag = True
                     i += 1
             if flags == [True] * 5:
-                dev = Wired()
-                time.sleep(1)
+                dev = Wired(port = PORT)
                 meas = dev.measure(255, ACC, int(FREQ), int(SMPSIZE))
                 ls = []
                 for i in range(len(meas[0])*3):
