@@ -1,0 +1,2 @@
+include include/SMCom.h
+include include/SMCom.tpp

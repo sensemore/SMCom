@@ -1,1 +1,0 @@
-#blank init file for SMComPy module

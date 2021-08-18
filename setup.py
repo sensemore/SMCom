@@ -56,10 +56,9 @@ def generate_so_file():
 					module_name + python_extension
 				])
 
-
 ext_modules = [
     Pybind11Extension(module_name,
-        sources = ["src/SMCom.cpp", "smcompy/pybind11_config.cpp"],
+        sources = ["src/SMCom.cpp", "SMComPy/pybind11_config.cpp"],
 		include_dirs = ["include"],
 		language="c++"
 	),
@@ -78,22 +77,3 @@ setup(
     cmdclass={"build_ext": build_ext},
     zip_safe=False,
 )
-
-
-# module1 = Extension('SMCom_pybind',
-#                     include_dirs = [*pybind11_includes,*header_files],
-#                     sources = [*source_files],
-# 					language="c++",
-# 					extra_compile_args=[optimization_flag,*so_flags]
-# 					)
-
-# setup(
-#    name=module_name,
-#    version='0.1.0',
-#    description='SMCom python wrapper',
-#    author='sensemore',
-#    author_email='example@foo.com',
-#    packages=[module_name],  #same as name
-#    install_requires=['serial', 'pybind11'], #external packages as dependencies,
-#    ext_modules = [module1]
-# )
