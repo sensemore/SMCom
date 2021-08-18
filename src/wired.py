@@ -491,7 +491,7 @@ def parse_arg():
     data = parser.parse_args()
     if argv[1] == 'update':
         dev = Wired(port = data.port)
-        dev.firmware_update(dev.mac_address, data.fileadr)
+        dev.firmware_update(dev.mac_address, data.binfile)
     elif argv[1] == 'measure':
         dev = Wired(port = data.port)
         meas = dev.measure(255, data.acc, data.freq, data.smpsize)
