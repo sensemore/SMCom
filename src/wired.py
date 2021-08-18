@@ -5,9 +5,11 @@ import time
 import queue
 import atexit
 from enum import Enum
+from sys import argv
+from os import system
 
 BAUD_RATE = 115200
-PORT = '/dev/ttyUSB1'
+PORT = "/dev/ttyUSB0"
 WIRED_FIRMWARE_MAX_RETRY_FOR_ONE_PACKET = 5
 
 class SMCOM_WIRED_MESSAGES(Enum):
@@ -81,7 +83,7 @@ class PySMComPacket:
 class Wired(SMCom.SMCOM_PUBLIC):
     accelerometer_coefficients= [(2*2)/(1<<16), (2*2)/(1<<16), (4*2)/(1<<16), (8*2)/(1<<16), (16*2)/(1<<16)]
 
-    def __init__(self, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
+    def __init__(self, port = PORT, rx_buffer_size = 1024, tx_buffer_size = 1024, device_id = 13):
         """
         Takes rx_buffer_size, tx_buffer_size and transmitter_id as arguments; 
         creates and returns a wired(inherited from SMCom<SMCOM_PUBLIC>)
@@ -89,9 +91,9 @@ class Wired(SMCom.SMCOM_PUBLIC):
         super().__init__(device_id)
         self.transmitter_id = id
         
-        self.ser = serial.Serial(PORT, BAUD_RATE)
+        self.ser = serial.Serial(port, BAUD_RATE)
 
-        atexit.register(self.__cleanup)
+        atexit.register(self.__del__)
         
         self.data_queue = queue.Queue()
         self.mutex = threading.Lock()
@@ -103,8 +105,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         self.version = self.get_version(15)
         self.mac_address = self.get_mac_address(15)
-
-        print("Constuctor called !")
 
     def __thread_func__(self):
         while self.continue_thread:
@@ -178,6 +178,10 @@ class Wired(SMCom.SMCOM_PUBLIC):
             return None
 
     def get_version(self, id, timeout = 3):
+        """
+        Takes receiver id and timeout(default is 3) as argument and returns version of the device
+        in format (MAJOR.MINOR.PATCH)(Ex. 1.0.12) with given id (15 or 255 are reserved as public id)
+        """
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.GET_VERSION.value, [], 0)
         if(write_ret != SMCom.SMCOM_STATUS_SUCCESS):
             return write_ret
@@ -191,6 +195,10 @@ class Wired(SMCom.SMCOM_PUBLIC):
         return version
     
     def get_mac_address(self, id, timeout = 3):
+        """
+        Takes receiver id as argument and returns mac address of the device with given id as string in format
+        (XX:XX:XX:XX:XX:XX) (15 or 255 are reserved as public id).
+        """
         write_ret = self.write(id, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_INIT.value, [0,0,0,0,0], 5)
         if write_ret != SMCom.SMCOM_STATUS_SUCCESS:
             return write_ret
@@ -235,9 +243,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
         if(notify_measurement_end):
             #calculate end amount and give also additional time
             expected_timeout = sample_size/freq + (sample_size*0.1)
-            #self.dirty_listener(1)
             data_packet = self.data_queue.get(timeout = expected_timeout)
-            print("measurement ended:",data_packet.data[0],data_packet.data[0]==WIRED_MESSAGE_STATUS.SUCCESS.value,WIRED_MESSAGE_STATUS.SUCCESS.value)
             return (data_packet.data[0] == WIRED_MESSAGE_STATUS.SUCCESS.value)
         
         return True
@@ -257,7 +263,6 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         from math import ceil
         expected_packets = ceil(data_len/240)
-        print("Exptected packets",expected_packets)
         while(expected_packets != 0):
             packet = self.data_queue.get(timeout = 10)
             expected_packets -= 1
@@ -345,7 +350,7 @@ class Wired(SMCom.SMCOM_PUBLIC):
 
         return telems
 
-    def firmware_update(self, receiver_id, mac, bin_file_address, timeout = 10):
+    def firmware_update(self, mac, bin_file_address, receiver_id = 255, timeout = 10):
         """
         Takes receiver_id, mac_address, address of binary file, and timeout(default 10) and return SMCom_Status_t 
         or WIRED_MESSAGE_STATUS type as int.
@@ -466,20 +471,114 @@ class Wired(SMCom.SMCOM_PUBLIC):
     ]
 
     def __del__(self):
-        print("dest called")
         self.continue_thread = False
         self.ser.close()
 
-    def __cleanup(self):
-        print("Closing serial port!")
-        self.continue_thread = False
-        self.ser.close()
+def parse_args():
+    global PORT
+    def update_help():
+        print(" Usage [--port] PORT [--binfile] FILEADR",
+              "or you can just use [--update PORT FILEADR]\n",
+              "Update firmware of the device connected to given port with given bin file\n\n"
+              "Positional arguments:\n",
+              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
+              "FILEADR\t\taddress of the binary file containing the firmware update\n")
 
+    def measure_help():
+        print(" Usage [--port] PORT [--acc] ACC [--freq] FREQ [--size] SMPSIZE [--outfile] FILEADR",
+              "or you can just use [--measure PORT ACC FREQ SMPSIZE FILEADR]\n\n",
+              "Positional arguments:\n",
+              "PORT\t\t\tport address of the device (linux /dev/ttyUSBX, win32 COMX, X is an integer)\n",
+              "ACC\t\t\tacceleration range: Possible args: 2G, 4G, 8G, 16G\n",
+              "FREQ\t\t\tsampling frequency: Possible args: 800, 1600, 3200, 6400, 12800\n",
+              "SMPSIZE\t\tsampling size: Number of samples\n",
+              "FILEADR\t\toutput file address which measurement data will be written\n"
+        )
 
+    if len(argv) == 1 or argv[1] == '-h' or argv[1] == '--help':
+        print(" Usage [-h or --help] [--update [update_args]] [--measure [measure_args]]\n\n",
+              "To get help about one of the function use [--function -h]: (ex. [--update -h])\n")
 
+    elif argv[1] == "--update":
+        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"): 
+            update_help()
+        else:
+            port_flag = False
+            bin_flag = False
+            if len(argv) == 4:
+                PORT, FILEADR = argv[2:4]
+                bin_flag, port_flag = True, True
+            else:
+                i = 0
+                while i < len(argv):
+                    if argv[i] == "--port":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            port_flag = True
+                    elif argv[i] == "--binfile":
+                        if len(argv) > i:
+                            FILEADR = argv[i+1]
+                            i += 1
+                            bin_flag = True
+                    i += 1
+            if bin_flag and port_flag:
+                dev = Wired()
+                time.sleep(1)
+                dev.firmware_update(dev.mac_address, FILEADR)
+            else:
+                update_help()
+    
+    elif argv[1] == "--measure":
+        if (len(argv) <= 3 or argv[2] == "--help" or argv[2] == "-h"):
+            measure_help()
+        else:
+            flags = [False] * 5
+            if len(argv) == 7:
+                PORT, ACC, FREQ, SMPSIZE, FILEADR = argv[2:7]
+                flags = [True] * 5
+            else:
+                i = 0
+                while i < len(argv):
+                    if argv[i] == "--port":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            flags[0] = True
+                    elif argv[i] == "--acc":
+                        if len(argv) > i:
+                            ACC = argv[i+1]
+                            i += 1
+                            flags[1] = True
+                    elif argv[i] == "--freq":
+                        if len(argv) > i:
+                            FREQ = argv[i+1]
+                            i += 1
+                            flags[2] = True
+                    elif argv[i] == "--size":
+                        if len(argv) > i:
+                            SMPSIZE = argv[i+1]
+                            i += 1
+                            flags[3] = True
+                    elif argv[i] == "--outfile":
+                        if len(argv) > i:
+                            PORT = argv[i+1]
+                            i += 1
+                            flags[4] = True
+                    i += 1
+            if flags == [True] * 5:
+                dev = Wired()
+                time.sleep(1)
+                meas = dev.measure(255, ACC, int(FREQ), int(SMPSIZE))
+                ls = []
+                for i in range(len(meas[0])*3):
+                    ls.append(meas[i%3][i//3])
+                f = open(FILEADR, "w")
+                for i in ls:
+                    print(i, file = f)
+                f.close()
+            else:
+                measure_help()
 
 if __name__ == "__main__":
-    pass
-
-
-
+    parse_args()
