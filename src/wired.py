@@ -96,12 +96,13 @@ class Wired(SMCom.SMCOM_PUBLIC):
         self.data_queue = queue.Queue()
         self.mutex = threading.Lock()
         self.mutex_timeout = 10
-        # self.version = self.get_version(15)
-        # self.mac_address = self.get_mac_address(15)
         self.continue_thread = True
         
         self.listener_thread = threading.Thread(target=self.__thread_func__, daemon=True)
         self.listener_thread.start()
+
+        self.version = self.get_version(15)
+        self.mac_address = self.get_mac_address(15)
 
         print("Constuctor called !")
 
@@ -203,7 +204,20 @@ class Wired(SMCom.SMCOM_PUBLIC):
         data = packet.data
         data = tuple(data[:-3])
         return "%02X:%02X:%02X:%02X:%02X:%02X"%data
-            
+
+    def assign_new_id(self, mac_address, id):
+        """
+        Takes mac adress and id to be assigned to the given mac address as arguments assigns the 
+        receiver id to the device which has mac address same as given and return None.
+        """
+        data = []
+        data.append(id)
+        mac_address = mac_address.split(':')
+        for i in range(len(mac_address)):
+            mac_address[i] = int(mac_address[i], base = 16)
+        data.extend(mac_address)
+        self.write(255, SMCOM_WIRED_MESSAGES.AUTO_ADDRESSING_SET_NEW_ID, data, len(data))
+    
     def start_batch_measurement(self, id, acc, freq, sample_size, notify_measurement_end = True):
         if(sample_size <= 0 or sample_size >= 1000000 or (str(freq) not in sampling_frequency_dict.keys()) or (str(acc) not in acc_range_dict.keys()) ):
             #Return arg error here
@@ -299,32 +313,37 @@ class Wired(SMCom.SMCOM_PUBLIC):
                     convert_byte_list_to_double(bl[start+16:start+24])]
             start += 8
             return dl
-    
+        major, minor, patch = self.version.split('.')
+        
         clearance = byte_list_to_double_list(telemetries)
         crest = byte_list_to_double_list(telemetries)
         grms = byte_list_to_double_list(telemetries)
         kurtosis = byte_list_to_double_list(telemetries)
         skewness = byte_list_to_double_list(telemetries)
-        vrms = byte_list_to_double_list(telemetries)
-        peak = byte_list_to_double_list(telemetries)
-        sum = byte_list_to_double_list(telemetries)
-        peak_to_peak = byte_list_to_double_list(telemetries)
 
-        telemetries = {
+        telems = {
             "temperature":temperature/100,
             "calibrated_frequency":calibrated_frequency,
             "clearance":clearance,
             "crest":crest,
             "grms":grms,
             "kurtosis":kurtosis,
-            "skewness":skewness,
-            "vrms":vrms,
-            "peak":peak,
-            "sum":sum,
-            "peak_to_peak":peak_to_peak
+            "skewness":skewness
         }
 
-        return telemetries
+        if int(patch) >= 9:
+            vrms = byte_list_to_double_list(telemetries)
+            peak = byte_list_to_double_list(telemetries)
+            sum = byte_list_to_double_list(telemetries)
+            telems["vrms"] = vrms
+            telems["peak"] = peak
+            telems["sum"] = sum
+            
+        if int(patch) >= 13:
+            peak_to_peak = byte_list_to_double_list(telemetries)
+            telems["peak_to_peak"] = peak_to_peak
+
+        return telems
 
     def firmware_update(self, receiver_id, mac, bin_file_address, timeout = 10):
         """
