@@ -31,7 +31,7 @@
 #define SMCOM_MINOR_VERSION__ 	0
 #define SMCOM_PATCH_LEVEL__ 	1
 #define SMCOM_VERSION_STRING	"1.0.1"
-#define SMCOM_VERSION (SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__
+#define SMCOM_VERSION ((SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__)
 #define MAX_RETRY_FOR_WRITE 5
 /*
 	Some configurations macros before including this class
@@ -393,8 +393,10 @@ private:
 	#define CRC_CCITT_SEED 0x1d0f
 
 	uint16_t compute_crc_ibm(uint16_t crc, uint8_t data);
-	uint16_t get_crc_ibm(const uint8_t * buffer, uint8_t len,uint16_t crc = CRC_IBM_SEED);
+	uint16_t get_crc_ibm(const uint8_t * buffer, uint8_t len, uint16_t crc = CRC_IBM_SEED);
 };
 
+
+#include "SMCom.tpp"
 
 #endif

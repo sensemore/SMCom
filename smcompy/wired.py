@@ -1,4 +1,3 @@
-import SMCom
 import serial
 import threading
 import time
@@ -7,6 +6,9 @@ import atexit
 from enum import Enum
 from sys import argv, stdout
 from argparse import ArgumentParser
+
+#Before importing SMCom check the .so or .dll file!
+import SMCom
 
 BAUD_RATE = 115200
 PORT = "/dev/ttyUSB0"

@@ -1,5 +1,4 @@
 #include "SMCom.h"
-#include "public_test.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <string.h>
@@ -182,7 +181,7 @@ public:
     
     
 
-PYBIND11_MODULE(SMCom, m) {
+PYBIND11_MODULE(SMComPy, m) {
     py::enum_<SMCom_Status_t>(m, "SMCom_Status_t")
         .value("SMCOM_STATUS_DEFAULT", SMCom_Status_t::SMCOM_STATUS_DEFAULT)
         .value("SMCOM_STATUS_SUCCESS", SMCom_Status_t::SMCOM_STATUS_SUCCESS)

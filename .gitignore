@@ -7,3 +7,4 @@ src/SMCom.h.gch
 *.so
 *.out
 wiredTemp.cpp
+.bin

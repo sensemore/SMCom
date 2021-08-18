@@ -1,0 +1,2 @@
+pyserial
+pybind11
