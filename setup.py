@@ -58,7 +58,7 @@ def generate_so_file():
 
 ext_modules = [
     Pybind11Extension(module_name,
-        sources = ["src/SMCom.cpp", "SMComPy/pybind11_config.cpp"],
+        sources = ["src/SMCom.cpp", "SMComPy_src/pybind11_config.cpp"],
 		include_dirs = ["include"],
 		language="c++"
 	),

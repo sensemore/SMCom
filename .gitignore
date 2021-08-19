@@ -8,3 +8,6 @@ src/SMCom.h.gch
 *.out
 wiredTemp.cpp
 .bin
+
+SMComPy.egg-info
+dist/
