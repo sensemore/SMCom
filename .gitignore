@@ -1,13 +1,19 @@
 /build
 /src/__pycache__
-/.vscode
-src/SMCom.cpython-38-x86_64-linux-gnu.so
 wrapping.code-workspace
 src/SMCom.h.gch
 *.so
 *.out
 wiredTemp.cpp
 .bin
+*.pyc
 
 SMComPy.egg-info
 dist/
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
