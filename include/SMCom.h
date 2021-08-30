@@ -230,10 +230,10 @@ public:
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
 	SMCom_Status_t handle_message_data(const uint8_t * raw_bytes, uint16_t len);
 
-	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 
-	SMCom_Status_t write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
@@ -245,16 +245,16 @@ public:
 	SMCom_Status_t get_version(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
 	SMCom_Status_t get_version(uint32_t timeout, request_response_callback fptr);
 	#endif
-	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 	
 
 
-	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len);
-	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len);
-	SMCom_Status_t push_to_queue(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t finalize_queue();
+	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t push_to_queue(const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t finalize_queue(uint8_t retry = 1);
 
 	//If given message length is smaller than the packet size, we add padding bytes to fullfill the condition of packet size
 	//If it is greater than the packet size we return an error
@@ -317,9 +317,12 @@ protected:
 
 private:
 
-	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len);
-	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len);
+	SMCom_Status_t __write__retry(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+
+
+	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
 
 	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 	SMCom_Status_t common_request(const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr);
@@ -331,9 +334,9 @@ private:
 	SMCom_Status_t common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer);
 	SMCom_Status_t common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer);
 
-	SMCom_Status_t common_start_write_queue();
-	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len);	
-	SMCom_Status_t common_finalize_queue();
+	SMCom_Status_t common_start_write_queue(uint8_t retry=1);
+	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len,uint8_t retry=1);	
+	SMCom_Status_t common_finalize_queue(uint8_t retry=1);
 
 	SMCom_Status_t respond_smcom_special_messages(CT * packet);
 	SMCom_Status_t common_respond_smcom_special_messages(CT * packet);

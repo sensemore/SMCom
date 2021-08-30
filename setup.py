@@ -64,16 +64,33 @@ ext_modules = [
 	),
 ]
 
+
+with open("README.md", "r", encoding="utf-8") as f:
+    long_description = f.read()
+
+
 setup(
     name=module_name,
-    version="0.0.1",
+    version="0.0.14",
     author="sensemore",
+	author_email="hello@sensemore.io",
     url="https://www.sensemore.io",
     description="SMComPy project",
-    long_description="",
+    long_description=long_description,
+	long_description_content_type="text/markdown",
     ext_modules=ext_modules,
+	license="MIT",
     # Currently, build_ext only provides an optional "highest supported C++
     # level" feature, but in the future it may provide more features.
     cmdclass={"build_ext": build_ext},
     zip_safe=False,
+	python_requires=">=3.6",
+	install_requires=[
+		"pyserial==3.5",
+		"pybind11==2.7.0",
+	],
+	setup_requires=[
+		"setuptools>=42",
+		"wheel",
+	]
 )

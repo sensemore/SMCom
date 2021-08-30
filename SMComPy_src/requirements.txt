@@ -1,2 +1,3 @@
+setuptools>=42
 pyserial==3.5
 pybind11==2.7.0

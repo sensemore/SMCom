@@ -45,20 +45,20 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::write(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry){
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len, uint8_t retry){
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = t;
 	com_packet.message_id = message_id;
 	com_packet.data_len = len;
-	return common_start_write_queue();
+	return common_start_write_queue(retry);
 }
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
@@ -88,19 +88,19 @@ SMCom_Status_t SMCom<SMCOM_PRIVATE>::get_version(uint32_t timeout, request_respo
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry){
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = message_id;
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PRIVATE>::respond(const SMCOM_PRIVATE * inc_packet, const uint8_t * buffer, uint8_t len,uint8_t retry){
 	if(inc_packet->message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 template<>
@@ -205,21 +205,21 @@ void SMCom<SMCOM_PUBLIC>::assign_new_id(uint8_t id){
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::write(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len,uint8_t retry){
 
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
 	com_packet.message_type = SMCom_message_types::WRITE;
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len){
-	return write(PUBLIC_ID_4BIT,message_id, buffer, len);
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len,uint8_t retry){
+	return write(PUBLIC_ID_4BIT,message_id, buffer, len, retry);
 }
 
 
@@ -255,18 +255,18 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::get_version(uint8_t receiver_id, uint32_t ti
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(const SMCOM_PUBLIC * inc_packet, const uint8_t * buffer, uint8_t len,uint8_t retry){
 
 	if(inc_packet->message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
 	com_packet.message_type = SMCom_message_types::RESPONSE;
 	com_packet.message_id = inc_packet->message_id;
 	com_packet.receiver_id = inc_packet->transmitter_id;
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len,uint8_t retry){
 
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
@@ -274,7 +274,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond(uint8_t receiver_id,uint8_t message_
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
 
-	return common_write(buffer,len);
+	return common_write(buffer,len,retry);
 }
 
 
@@ -290,7 +290,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::respond_smcom_special_messages(SMCOM_PUBLIC 
 
 
 template<>
-SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len){
+SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len, uint8_t retry){
 
 	if(message_id > SMCOM_MAX_USER_MESSAGE_ID) return SMCOM_STATUS_MESSAGE_ID_ERROR;
 
@@ -298,7 +298,7 @@ SMCom_Status_t SMCom<SMCOM_PUBLIC>::start_write_queue(SMCom_message_types t, uin
 	com_packet.message_id = message_id;
 	com_packet.receiver_id = receiver_id;
 	com_packet.data_len = len;
-	return common_start_write_queue();
+	return common_start_write_queue(retry);
 }
 
 

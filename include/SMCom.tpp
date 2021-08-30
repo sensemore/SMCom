@@ -144,7 +144,7 @@ SMCom_Status_t SMCom<T>::common_request(const uint8_t * raw_bytes, uint8_t len, 
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_start_write_queue(){
+SMCom_Status_t SMCom<T>::common_start_write_queue(uint8_t retry){
 
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1.
@@ -160,33 +160,17 @@ SMCom_Status_t SMCom<T>::common_start_write_queue(){
 	uint8_t head = MESSAGE_START;
 	last_crc = get_crc_ibm(&head,1,last_crc);
 
-	uint8_t retry = 0;
-	while(true)
-	{
-		ret = __write__(&head,1);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			return ret;
-		retry++;	
+	ret = __write__retry(&head,1,retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 
 	txflag.start_byte_flag = 1;
-
 	//Msg sequence
 	last_crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),last_crc);
 	
-	retry = 0;
-	while(true)
-	{
-		ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			return ret;
-		retry++;	
-	}
-
+	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	
 	txflag.rx_tx_id_flag = 1;
 
 	com_packet.data_len = 0;
@@ -196,7 +180,7 @@ SMCom_Status_t SMCom<T>::common_start_write_queue(){
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t len, uint8_t retry){
 
 	if(buffer == NULL && len != 0) return SMCOM_STATUS_FAIL;
 
@@ -212,15 +196,9 @@ SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t le
 	//Data sequence
 	last_crc = get_crc_ibm(buffer,len,last_crc);
 
-	uint8_t retry = 0;
-	while(true)
-	{
-		ret = __write__(buffer,len);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			return ret;
-		retry++;	
+	ret = __write__retry(buffer,len,retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 
 	txflag.data_flag = 1;
@@ -229,7 +207,7 @@ SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t le
 }
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_finalize_queue(){
+SMCom_Status_t SMCom<T>::common_finalize_queue(uint8_t retry){
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 
 	if(txflag.start_byte_flag == 0) return SMCOM_STATUS_START_BYTE_ERROR;
@@ -239,20 +217,12 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 
 	uint8_t last_bytes[3] = {(uint8_t)((last_crc>>8)&0x00FF), (uint8_t)(last_crc & 0x00FF), MESSAGE_END};
 	
-	uint8_t retry = 0;
-	while(true)
-	{
-		ret = __write__(last_bytes,3);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			break;
-		retry++;	
+	ret = __write__(last_bytes,3,retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 	
-	// ret = __write__(last_bytes,3);
 	txflag.crc_flag = 1;
-
 
 	if(tx_event_handler_callback_ptr != NULL){
 		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
@@ -265,7 +235,7 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(){
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len, uint8_t retry){
 	//before calling this function check that txbuffer is not null
 
 	uint16_t crc = CRC_IBM_SEED;
@@ -316,23 +286,15 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	txflag.crc_flag = 1;
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
-	uint8_t retry = 0;
-	while(true)
-	{
-		ret = __write__(tx_buffer,txit);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			break;
-		retry++;	
-	}
 
+	ret = __write__retry(tx_buffer,txit,retry);
+	
 	return ret;
 }
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t len, uint8_t retry){
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	uint16_t crc = CRC_IBM_SEED;
@@ -355,15 +317,9 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	uint8_t head = MESSAGE_START;
 	crc = get_crc_ibm(&head,1,crc);
 	
-	uint8_t retry = 0;
-	while(true)
-	{
-		ret = __write__(&head,1);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			return ret;
-		retry++;	
+	ret = __write__retry(&head,1,retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 
 	txflag.start_byte_flag = 1;
@@ -371,31 +327,20 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	//Msg sequence
 	crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),crc);
 	
-	retry = 0;
-	while(true)
-	{
-		ret = __write__((uint8_t *)&com_packet,sizeof(com_packet));
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			return ret;
-		retry++;	
+	
+	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 
 	txflag.rx_tx_id_flag = 1;
 
-	if(len){
+	if(len > 0){
 		//Data sequence
 		crc = get_crc_ibm(buffer,len,crc);
-		retry = 0;
-		while(true)
-		{
-			ret = __write__(buffer,len);
-			if(ret == SMCOM_STATUS_SUCCESS) 
-				break;
-			if(retry >= MAX_RETRY_FOR_WRITE)
-				return ret;
-			retry++;	
+		ret = __write__retry(buffer,len,retry);
+		if(ret != SMCOM_STATUS_SUCCESS){
+			return ret;
 		}
 	}
 	
@@ -404,15 +349,9 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 		uint16_t padding = (packet_size - possible_packet_size);
 		while(padding--){
 			uint8_t d = 0;
-			retry = 0;
-			while(true)
-			{
-				ret = __write__(&d,1);
-				if(ret == SMCOM_STATUS_SUCCESS) 
-					break;
-				if(retry >= MAX_RETRY_FOR_WRITE)
-					return ret;
-				retry++;	
+			ret = __write__retry(&d,1,retry);
+			if(ret != SMCOM_STATUS_SUCCESS){
+				return ret;
 			}
 		}
 	}
@@ -422,16 +361,10 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	uint8_t last_bytes[3] = {(uint8_t)((crc>>8)&0x00FF), (uint8_t)(crc & 0x00FF), MESSAGE_END};
 
 	txflag.crc_flag = 1;
-
-	retry = 0;
-	while(true)
-	{
-		ret = __write__(last_bytes,3);
-		if(ret == SMCOM_STATUS_SUCCESS) 
-			break;
-		if(retry >= MAX_RETRY_FOR_WRITE)
-			break;
-		retry++;	
+	
+	ret = __write__retry(last_bytes,3,retry);
+	if(ret != SMCOM_STATUS_SUCCESS){
+		return ret;
 	}
 
 	return ret;
@@ -439,7 +372,7 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
+SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len, uint8_t retry){
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1.
 		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
@@ -455,11 +388,10 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len){
 	clear_tx_flag();
 
 	if(tx_buffer && tx_buf_size){
-		smcom_log("calling common write tx");
-		ret = common_write_txbuffer(buffer,len);
+		ret = common_write_txbuffer(buffer,len,retry);
 	}
 	else{
-		ret = common_write_polling(buffer,len);
+		ret = common_write_polling(buffer,len,retry);
 	}
 	//if it is a request we won't call general tx handler because each request has its own callback function
 	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
@@ -675,6 +607,17 @@ SMCom_Status_t SMCom<T>::listener(void){
 	return status;
 }
 
+template<typename T>
+SMCom_Status_t SMCom<T>::__write__retry(const uint8_t * buffer, uint8_t len, uint8_t retry){
+	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
+	for(uint8_t i = 0; i<retry; ++i){
+		if( (ret = __write__(buffer,len)) != SMCOM_STATUS_SUCCESS){
+			return ret;
+		}
+	}
+	return ret;
+}
+
 
 template<typename T>
 SMCom_Status_t SMCom<T>::handle_message_data(const uint8_t * raw_bytes, uint16_t len){
@@ -685,12 +628,12 @@ SMCom_Status_t SMCom<T>::verify_message_header(const uint8_t * raw_bytes, uint16
 	return common_verify_message_header(raw_bytes,len,true);
 }
 template<typename T>
-SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len){
-		return common_push_to_queue(buffer,len);
+SMCom_Status_t SMCom<T>::push_to_queue(const uint8_t * buffer, uint8_t len,uint8_t retry){
+	return common_push_to_queue(buffer,len,retry);
 }
 template<typename T>
-SMCom_Status_t SMCom<T>::finalize_queue(){
-	return common_finalize_queue();
+SMCom_Status_t SMCom<T>::finalize_queue(uint8_t retry){
+	return common_finalize_queue(retry);
 }
 
 
