@@ -1,0 +1,172 @@
+#include "thread_test.h"
+#include <queue>
+
+#include <random>
+#include <functional> //for std::function
+#include <algorithm>  //for std::generate_n
+
+auto time_start = std::chrono::system_clock::now();
+
+long unsigned tick(){
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - time_start).count();
+}
+
+
+std::string random_string( size_t length )
+{
+    auto randchar = []() -> char
+    {
+        const char charset[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+        const size_t max_index = (sizeof(charset) - 1);
+        return charset[ rand() % max_index ];
+    };
+    std::string str(length,0);
+    std::generate_n( str.begin(), length, randchar );
+    return str;
+}
+
+#define MAX_DELAY (0xFFFFFFFF)
+
+template<typename T>
+class sync_queue{
+
+	std::queue<T> que;
+	std::timed_mutex mutex;
+	public:
+
+	bool receive(T & rec, uint32_t timeout_ms){
+
+		bool ret = false;
+
+		if(timeout_ms == MAX_DELAY){
+			if(mutex.try_lock()){
+				if(que.size()>0){
+					rec = que.front();
+					que.pop();
+					ret = true;
+				}
+				else{
+					ret = false;
+				}
+				mutex.unlock();
+				return ret;
+			}
+		}
+		else{
+			if(mutex.try_lock_for(std::chrono::milliseconds(timeout_ms))){
+				if(que.size()>0){
+					rec = que.front();
+					que.pop();
+					ret = true;
+				}
+				else{
+					ret = false;
+				}
+				mutex.unlock();
+				return ret;
+			}
+			else{
+				return false;
+			}
+		}
+		return false;
+	}
+
+	bool send(const T &msg, uint32_t timeout_ms){
+		if(mutex.try_lock_for(std::chrono::milliseconds(timeout_ms))){
+			que.push(msg);
+			mutex.unlock();
+			return true;
+		}
+		return false;	
+	}
+
+	// size_t available(uint32_t timeout_ms){
+	// 	size_t avlb = 0;
+	// 	if(timeout_ms == MAX_DELAY){
+	// 		if(mutex.try_lock()){
+	// 			avlb = que.size();
+	// 			mutex.unlock();
+	// 		}
+	// 	}
+	// 	else{
+	// 		if(mutex.try_lock_for(std::chrono::milliseconds(timeout_ms))){
+	// 			avlb = que.size();
+	// 			mutex.unlock();
+	// 		}
+	// 	}
+
+	// 	return avlb;
+	// }
+
+	
+};
+
+using namespace std::chrono_literals;
+ 
+std::timed_mutex mutex;
+
+
+static sync_queue<std::string> myqueue;
+
+// The function we want to execute on the new thread.
+void receiver(std::string msg){
+    printf("This is recevier:%s\n",msg.c_str());
+
+	std::string received;
+	for(;;){
+		if(myqueue.receive(received,MAX_DELAY)){
+			printf("(%lu) %s <--- '%s'\n",tick(),msg.c_str(),received.c_str());
+		}
+	}
+}
+
+// The function we want to execute on the new thread.
+void sender(std::string msg){
+    printf("This is sender:%s\n",msg.c_str());
+
+	while(1){	
+		std::string send_str = random_string(10);
+		if(myqueue.send(send_str,MAX_DELAY)){
+			printf("(%lu)%s ---> %s \n",tick(),msg.c_str(),send_str.c_str());
+		}
+		else{
+			printf("(%lu)%s --X--> %s\n",tick(),msg.c_str(),send_str.c_str());
+		}
+
+		std::this_thread::sleep_for(1000ms);
+	}
+
+}
+
+
+std::vector<std::thread> thread_test(){
+    // Constructs the new thread and runs it. Does not block execution.
+    std::vector<std::thread> thread_vector;
+
+
+
+	
+	std::thread trec1(receiver, "rec1");
+	std::thread trec2(receiver, "rec2");
+	std::thread trec3(receiver, "rec3");
+	std::thread trec4(receiver, "rec4");
+	std::thread tsend1(sender, "send1");
+	std::thread tsend2(sender, "send2");
+	
+
+
+	thread_vector.push_back(std::move(trec1));
+	thread_vector.push_back(std::move(trec2));
+	thread_vector.push_back(std::move(trec3));
+	thread_vector.push_back(std::move(trec4));
+
+
+	thread_vector.push_back(std::move(tsend1));
+	thread_vector.push_back(std::move(tsend2));
+
+    return thread_vector;
+}

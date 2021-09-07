@@ -13,9 +13,9 @@
 #include <cstdint>
 #include <cstring>
 
-//#ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
+#ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
 //#define SMCOM_CONFIG_REQUEST_RESPONSE
-//#endif
+#endif
 
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 #include <ctime>
@@ -143,6 +143,8 @@ enum SMCom_Status_t : uint8_t{
 	SMCOM_STATUS_MESSAGE_LENGTH_ERROR,
 	SMCOM_STATUS_MESSAGE_ID_ERROR,
 	SMCOM_STATUS_NULL_MESSAGE,
+	SMCOM_STATUS_NOT_ACKNOWLEDGED,
+	SMCOM_STATUS_MUTEX_TIMEOUT,
 };
 
 
@@ -165,14 +167,14 @@ enum SMCom_event_types : uint8_t{
 	SM_WRITE_EVENT = 0,
 	SM_REQUEST_EVENT = 1,
 	SM_RESPONSE_EVENT = 2,
-	SM_INDICATE_EVENT = 3,
+	SM_UNUSED_EVENT = 3,
 };
 
 enum SMCom_message_types : uint8_t{
 	WRITE = 0,
 	REQUEST = 1,
-	RESPONSE = 2,
-	INDICATE = 3,
+	REQUEST_ACK = 2,
+	RESPONSE_ACK = 3,
 };
 
 //predefined char values
@@ -200,6 +202,9 @@ typedef struct smcom_message_get_version_struct__{
 	uint32_t version;
 }__attribute__((packed)) smcom_message_get_version_struct__;
 
+typedef struct{
+	uint32_t crc32;
+}__attribute__((packed)) smcom_message_write_ack;
 
 
 template <typename CT>
@@ -214,10 +219,6 @@ public:
 	virtual void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 	virtual void __tx_callback__(SMCom_event_types event, SMCom_Status_t status, const CT * packet);
 
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	typedef void(*request_response_callback)(SMCom_Status_t status, const CT * packet);
-	#endif
 	
 	////Constructors with dynamic buffers, uses C++ new allocater
 	SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
@@ -232,24 +233,13 @@ public:
 
 	SMCom_Status_t write(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 	SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t write_ack(uint8_t receiver_id,uint8_t message_id, const uint8_t * buffer, uint8_t len, uint16_t timeout, uint8_t retry = 1);
 
 	SMCom_Status_t write_public(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	SMCom_Status_t request(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
-	SMCom_Status_t request(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr = NULL);
-
-	SMCom_Status_t ping(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
-	SMCom_Status_t ping(uint32_t timeout, request_response_callback fptr);
-
-	SMCom_Status_t get_version(uint8_t receiver_id, uint32_t timeout, request_response_callback fptr);
-	SMCom_Status_t get_version(uint32_t timeout, request_response_callback fptr);
-	#endif
-	SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
-	SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
-	SMCom_Status_t respond(const CT * inc_packet, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
-	
-
+	//SMCom_Status_t respond(uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	//SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
+	SMCom_Status_t response_ack(const CT * inc_packet, const uint8_t * buffer, uint8_t len, uint8_t retry = 1);
 
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t receiver_id,uint8_t message_id, uint8_t len, uint8_t retry = 1);
 	SMCom_Status_t start_write_queue(SMCom_message_types t, uint8_t message_id, uint8_t len, uint8_t retry = 1);
@@ -267,6 +257,10 @@ public:
 	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) = 0;
 	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 	virtual size_t __available__();
+
+	virtual SMCom_Status_t __lock__(uint32_t timeout);
+	virtual void __unlock__();
+
 	//In order to call listener user must provide __read__ and __available__ functions
 	SMCom_Status_t listener(void);
 
@@ -277,11 +271,6 @@ public:
 		return stat == SMCOM_STATUS_CRC_ERROR;
 	}
 
-
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	void increase_ms_timer();
-	void run_request_scheduler();
-	#endif
 
 	uint16_t get_rx_buffer_size(){return rx_buf_size;};
 	void assign_new_id(uint8_t id);
@@ -303,6 +292,7 @@ public:
 			"SMCOM_MESSAGE_LENGTH_ERROR",
 			"SMCOM_MESSAGE_ID_ERROR",
 			"SMCOM_NULL_MESSAGE",
+			"SMCOM_STATUS_NOT_ACKNOWLEDGED"
 		};
 		return str_SMCom_Status_t[t];
 	}
@@ -317,52 +307,30 @@ protected:
 
 private:
 
+	CT const_com_packet;
+	uint32_t write_ack_crc32 = 0;
+
 	SMCom_Status_t __write__retry(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
 
 
-	SMCom_Status_t common_write(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
-	SMCom_Status_t common_write_polling(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
-	SMCom_Status_t common_write_txbuffer(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+	SMCom_Status_t common_write(CT * out_packet, const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+	SMCom_Status_t common_write_polling(CT * out_packet,const uint8_t * buffer, uint8_t len, uint8_t retry=1);
+	SMCom_Status_t common_write_txbuffer(CT * out_packet,const uint8_t * buffer, uint8_t len, uint8_t retry=1);
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	SMCom_Status_t common_request(const uint8_t * buffer, uint8_t len, uint32_t timeout, request_response_callback fptr);
-	#endif
 	
 	SMCom_Status_t common_read_internal(const uint8_t * raw_bytes, uint8_t len,uint8_t end_byte_start_offset);
-	SMCom_Status_t additional_buffer_check();
+	SMCom_Status_t additional_buffer_check(CT * in_packet);
 	
-	SMCom_Status_t common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer);
+	SMCom_Status_t common_verify_message_header(CT * in_packet, const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer);
 	SMCom_Status_t common_handle_message_data(const uint8_t * raw_bytes, uint16_t len, bool copy_buffer);
 
-	SMCom_Status_t common_start_write_queue(uint8_t retry=1);
-	SMCom_Status_t common_push_to_queue(const uint8_t * buffer, uint8_t len,uint8_t retry=1);	
-	SMCom_Status_t common_finalize_queue(uint8_t retry=1);
+	SMCom_Status_t common_start_write_queue(CT * out_packet, uint8_t retry=1);
+	SMCom_Status_t common_push_to_queue(CT * out_packet,const uint8_t * buffer, uint8_t len,uint8_t retry=1);	
+	SMCom_Status_t common_finalize_queue(CT * out_packet,uint8_t retry=1);
 
 	SMCom_Status_t respond_smcom_special_messages(CT * packet);
 	SMCom_Status_t common_respond_smcom_special_messages(CT * packet);
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	//@TODO
-	//Maybe we can add another request packet without fptr????
-	typedef struct request_packet{
-		CT packet;
-		uint32_t timeout_end;
-		request_response_callback fptr;
-	}request_packet;
-	
-	std::forward_list<request_packet> request_list;
-	typedef typename std::forward_list<request_packet>::iterator request_list_iterator; 
-
-	bool is_request_registered_before();
-	bool remove_request_from_list(CT * packet);
-	request_list_iterator get_request(CT * packet);
-	request_list_iterator get_timedout_request();
-	request_list_iterator check_incoming_response(CT * inc_packet);
-	SMCom_Status_t register_request(uint32_t timeout, request_response_callback fptr);
-	#endif
-
-
-	CT com_packet;
 
 	uint8_t * rx_buffer = NULL;
 	uint16_t rx_iter = 0;

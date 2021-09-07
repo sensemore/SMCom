@@ -13,7 +13,7 @@ WARNING_FLAG = -Werror -Wno-error=pointer-arith
 DEBUG_FLAG = -g
 
 CFLAGS = -c 
-LDFLAGS += -lm -Wl,--gc-sections -flto
+LDFLAGS += -lm -Wl,--gc-sections -flto -pthread
 CFLAGS += $(OPTIMIZATION_FLAG)
 CFLAGS += $(WARNING_FLAG)
 CFLAGS += $(DEBUG_FLAG)
@@ -29,7 +29,7 @@ LDFLAGS += $(LIB_LDFLAGS)
 OUT = test
 all: test
 $(OUT): $(OBJ)
-	@$(CC) -o $@ $^ $(LDFLAGS) 
+	@$(CC) -o $@ $^ $(LDFLAGS)
 
 #valgrind:
 #	make clean && make && valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./fbgc

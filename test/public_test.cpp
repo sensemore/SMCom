@@ -21,7 +21,9 @@ SMCom_Status_t public_node::__write__(const uint8_t * buffer, uint16_t len){
         }
         else{
             //CRC error must invoke!
-            write_queue.push(0xAB);
+            uint8_t x = buffer[i];
+            x = x ^ (1); //flip the bit
+            write_queue.push(x);
         }
 
         

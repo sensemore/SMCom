@@ -1,150 +1,7 @@
 //COMMON
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-void SMCom<T>::increase_ms_timer(){
-	//Warn about this function, since we cannot use threads here, callbacks must return immeadiately
-	++timeout_counter;
-}
-#endif
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-void SMCom<T>::run_request_scheduler(){
-	//Check that do we have a timedout request?
-	request_list_iterator prev;
-	while( (prev = get_timedout_request()) != request_list.end()){
-		//Actual request is the next of this
-		request_list_iterator it = std::next(prev);
-		if(it == request_list.end()){
-			return;
-		}
-		if(it->fptr != NULL){
-			it->fptr(SMCOM_STATUS_TIMEOUT,&it->packet);
-		}
-		else{
-			tx_event_handler_callback_ptr(SM_REQUEST_EVENT,SMCOM_STATUS_TIMEOUT,&it->packet);
-		}
-		request_list.erase_after(prev);
-	}
-	
-}
-#endif
-
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-typename SMCom<T>::request_list_iterator SMCom<T>::get_request(T * packet){
-	//We know that structs contain data_len/receiver_id/transmitter_id/message_id/message_type
-	//In all these cases some types don't contain some variables(eg receiver id)
-	//So skipping the data_len leaves the possible matches for requests
-	//in private case: message_id is important
-	//in public case: both message_id and receiver id is important etc.
-	uint8_t * ptr = ((uint8_t*)packet)+1; //Shift the data_len by shifting 1 byte
-	if(!request_list.empty() ){
-		auto it = request_list.before_begin();
-		auto nextit = std::next(it);
-		do{
-			uint8_t * p2 = ((uint8_t*)(&nextit->packet)) + 1; //Again do not compare the data_len which could be different
-			if(memcpy(ptr,p2,sizeof(T)-1) == 0){
-				//NOTICE THAT ITERATOR RETURNS ONE ITEM BEFORE THE FOUND OBJECT TO USE ERASE AFTER FUNCTION, USE IT WITH CARE
-				return it;
-			}
-			it = nextit;
-			nextit = std::next(it);
-		}while(nextit != request_list.end());
-	}
-	return 	request_list.end();
-}
-#endif
-
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-bool SMCom<T>::remove_request_from_list(T * packet){
-	request_list_iterator it = get_request(packet);
-	if(it == request_list.end())
-		return false;
-
-	//So we have the iterator one item before the request
-	request_list.erase_after(it);
-	return true;
-}
-#endif
-
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-typename SMCom<T>::request_list_iterator SMCom<T>::get_timedout_request(){
-	//Seek in the requests and return the previous iterator of the first timeout
-	if(!request_list.empty() ){
-		auto it = request_list.before_begin();
-		auto nextit = std::next(it);
-		do{
-			if(timeout_counter >= nextit->timeout_end){
-				//So timeout occured, return the iterator before next
-				return it;
-			}
-			it = nextit;
-			if(it == request_list.end()) break;
-			nextit = std::next(it);
-		}while(nextit != request_list.end());
-	}
-	return 	request_list.end();
-}
-#endif
-
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-bool SMCom<T>::is_request_registered_before(){
-	return get_request(&com_packet) != request_list.end();
-}
-#endif
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-SMCom_Status_t SMCom<T>::register_request(uint32_t timeout, request_response_callback fptr){
-	if(is_request_registered_before()){
-		return SMCOM_STATUS_FAIL;
-	}
-
-	//Do we need to stop timer ? Or just assume the below operation is fast
-	request_packet rp;
-	rp.timeout_end = timeout_counter+timeout; //There might be overflow here but timeout counter will also overflow at some point and leave us correct checking
-	rp.packet = com_packet;
-	rp.fptr = fptr;
-
-	request_list.push_front(rp);
-
-	return SMCOM_STATUS_SUCCESS;
-}
-#endif
-
-
-#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-template<typename T>
-SMCom_Status_t SMCom<T>::common_request(const uint8_t * raw_bytes, uint8_t len, uint32_t timeout, request_response_callback fptr){
-
-	if(raw_bytes == NULL && len != 0) return SMCOM_STATUS_FAIL;
-
-	com_packet.message_type = SMCom_message_types::REQUEST;
-
-	SMCom_Status_t ret = register_request(timeout,fptr);
-
-	if(ret == SMCOM_STATUS_SUCCESS){
-		ret = common_write(raw_bytes,len);
-		if(ret != SMCOM_STATUS_SUCCESS){
-			//Delete request, which is the first item in the list
-			request_list.erase_after(request_list.before_begin());
-		}
-	}
-	return ret;
-}
-#endif
-
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_start_write_queue(uint8_t retry){
+SMCom_Status_t SMCom<T>::common_start_write_queue(T * out_packet, uint8_t retry){
 
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1.
@@ -167,20 +24,20 @@ SMCom_Status_t SMCom<T>::common_start_write_queue(uint8_t retry){
 
 	txflag.start_byte_flag = 1;
 	//Msg sequence
-	last_crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),last_crc);
+	last_crc = get_crc_ibm((uint8_t *)out_packet,sizeof(T),last_crc);
 	
-	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	ret = __write__retry((uint8_t *)out_packet,sizeof(T),retry);
 	
 	txflag.rx_tx_id_flag = 1;
 
-	com_packet.data_len = 0;
+	out_packet->data_len = 0;
 
 	return ret;
 }
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t len, uint8_t retry){
+SMCom_Status_t SMCom<T>::common_push_to_queue(T * out_packet, const uint8_t * buffer, uint8_t len, uint8_t retry){
 
 	if(buffer == NULL && len != 0) return SMCOM_STATUS_FAIL;
 
@@ -189,9 +46,9 @@ SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t le
 	if(txflag.start_byte_flag == 0) return SMCOM_STATUS_START_BYTE_ERROR;
 	if(txflag.rx_tx_id_flag == 0) return SMCOM_STATUS_FAIL;
 
-	com_packet.data_len += len;
+	out_packet->data_len += len;
 
-	if(com_packet.data_len > MAX_MSG_LENGTH) return SMCOM_STATUS_FAIL;
+	if(out_packet->data_len > MAX_MSG_LENGTH) return SMCOM_STATUS_FAIL;
 
 	//Data sequence
 	last_crc = get_crc_ibm(buffer,len,last_crc);
@@ -207,12 +64,12 @@ SMCom_Status_t SMCom<T>::common_push_to_queue(const uint8_t * buffer, uint8_t le
 }
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_finalize_queue(uint8_t retry){
+SMCom_Status_t SMCom<T>::common_finalize_queue(T * out_packet, uint8_t retry){
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 
 	if(txflag.start_byte_flag == 0) return SMCOM_STATUS_START_BYTE_ERROR;
 	if(txflag.rx_tx_id_flag == 0) return SMCOM_STATUS_FAIL;
-	if(txflag.data_flag == 0 || com_packet.data_len == 0) return SMCOM_STATUS_FAIL;
+	if(txflag.data_flag == 0 || out_packet->data_len == 0) return SMCOM_STATUS_FAIL;
 
 
 	uint8_t last_bytes[3] = {(uint8_t)((last_crc>>8)&0x00FF), (uint8_t)(last_crc & 0x00FF), MESSAGE_END};
@@ -225,7 +82,7 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(uint8_t retry){
 	txflag.crc_flag = 1;
 
 	if(tx_event_handler_callback_ptr != NULL){
-		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+		tx_event_handler_callback_ptr((SMCom_event_types)out_packet->message_type,ret, out_packet);
 	}
 
 	clear_tx_flag();
@@ -235,11 +92,11 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(uint8_t retry){
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t len, uint8_t retry){
+SMCom_Status_t SMCom<T>::common_write_txbuffer(T * out_packet, const uint8_t * buffer, uint8_t len, uint8_t retry){
 	//before calling this function check that txbuffer is not null
 
 	uint16_t crc = CRC_IBM_SEED;
-	com_packet.data_len = len;
+	out_packet->data_len = len;
 
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
@@ -247,7 +104,7 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	if(packet_size > 0){
 		if(packet_size >= possible_packet_size){
 			//Tell receiver that this packet has padding bytes
-			com_packet.data_len += (packet_size - possible_packet_size);
+			out_packet->data_len += (packet_size - possible_packet_size);
 		}
 		else{
 			//If user fixes the packet size and try to exceed we won't publish the message
@@ -260,8 +117,8 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	tx_buffer[txit++] = MESSAGE_START;
 	txflag.start_byte_flag = 1;
 
-	memcpy(tx_buffer+txit,(uint8_t *)&com_packet,sizeof(com_packet));
-	txit += sizeof(com_packet);
+	memcpy(tx_buffer+txit,(uint8_t *)out_packet,sizeof(T));
+	txit += sizeof(T);
 	txflag.rx_tx_id_flag = 1;
 
 	if(len > 0){
@@ -294,18 +151,18 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t len, uint8_t retry){
+SMCom_Status_t SMCom<T>::common_write_polling(T * out_packet, const uint8_t * buffer, uint8_t len, uint8_t retry){
 
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	uint16_t crc = CRC_IBM_SEED;
-	com_packet.data_len = len;
+	out_packet->data_len = len;
 
 	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
 	uint16_t possible_packet_size = sizeof(T) + 4 + len;
 	if(packet_size > 0){
 		if(packet_size >= possible_packet_size){
 			//Tell receiver that this packet has padding bytes
-			com_packet.data_len += (packet_size - possible_packet_size);
+			out_packet->data_len += (packet_size - possible_packet_size);
 		}
 		else{
 			//If user fixes the packet size and try to exceed we won't publish the message
@@ -325,10 +182,10 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
-	crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),crc);
+	crc = get_crc_ibm((uint8_t *)out_packet,sizeof(T),crc);
 	
 	
-	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	ret = __write__retry((uint8_t *)out_packet,sizeof(T),retry);
 	if(ret != SMCOM_STATUS_SUCCESS){
 		return ret;
 	}
@@ -372,7 +229,7 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len, uint8_t retry){
+SMCom_Status_t SMCom<T>::common_write(T * out_packet, const uint8_t * buffer, uint8_t len, uint8_t retry){
 	if(rxflag.port_busy_flag){
 		//If header is verified and port is busy, this flag is set to 1.
 		//We should'not allow to send message while we didn't take the whole message, even though it is not for us. port_busy flag will be cleared after getting end byte
@@ -388,14 +245,14 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len, uint8
 	clear_tx_flag();
 
 	if(tx_buffer && tx_buf_size){
-		ret = common_write_txbuffer(buffer,len,retry);
+		ret = common_write_txbuffer(out_packet,buffer,len,retry);
 	}
 	else{
-		ret = common_write_polling(buffer,len,retry);
+		ret = common_write_polling(out_packet,buffer,len,retry);
 	}
 	//if it is a request we won't call general tx handler because each request has its own callback function
-	if(tx_event_handler_callback_ptr != NULL && com_packet.message_type != REQUEST)
-		tx_event_handler_callback_ptr((SMCom_event_types)com_packet.message_type,ret, &com_packet);
+	if(tx_event_handler_callback_ptr != NULL && out_packet->message_type != REQUEST)
+		tx_event_handler_callback_ptr((SMCom_event_types)out_packet->message_type,ret, out_packet);
 
 	return ret;
 }
@@ -404,7 +261,7 @@ SMCom_Status_t SMCom<T>::common_write(const uint8_t * buffer, uint8_t len, uint8
 
 
 template<typename T>
-SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
+SMCom_Status_t SMCom<T>::common_verify_message_header(T * in_packet, const uint8_t * raw_bytes, uint16_t * len, bool copy_buffer){
 
 	if(raw_bytes == NULL) return SMCOM_STATUS_NULL_MESSAGE;
 
@@ -431,10 +288,10 @@ SMCom_Status_t SMCom<T>::common_verify_message_header(const uint8_t * raw_bytes,
 	//Mesajın bitmesi 2.byte ile belirleniyor ve ek olarak 2 byte crc ile 1 byte end byte mesajı da alınmalı
 	//Len artık bir sonraki mesajın boyunu söylüyor
 	*len = rx_buffer[1] + 3;
-	com_packet.data_len = *len;
+	in_packet->data_len = *len;
 
 	//maybe this message is not for us, maybe port is busy
-	if(additional_buffer_check() != SMCOM_STATUS_SUCCESS){
+	if(additional_buffer_check(in_packet) != SMCOM_STATUS_SUCCESS){
 		rxflag.rx_tx_id_flag = 0;
 		rxflag.port_busy_flag = 1;
 		
@@ -493,43 +350,57 @@ SMCom_Status_t SMCom<T>::common_handle_message_data(const uint8_t * raw_bytes, u
 
 	//Skip the start byte and cast it to our message packet
 	T * packet = (T *) (rx_buffer+1);
-	SMCom_event_types evt = (SMCom_event_types) packet->message_type;
+	SMCom_event_types event = (SMCom_event_types) packet->message_type;
 
 	rxflag.data_flag = 1;
 
-	#ifdef SMCOM_CONFIG_REQUEST_RESPONSE
-	if(evt == SM_RESPONSE_EVENT || evt == SM_WRITE_EVENT){
-		//Check that is this a response from a registered request before ?
-		request_list_iterator prev = check_incoming_response(packet);
-		if(prev != request_list.end()){
-			request_list_iterator it = std::next(prev);
-			if(it->fptr != NULL){
-				it->fptr(ret,packet);
-				//set packet to null so we are not gonna call rxevent handler since we have already invoked this function
-				packet = NULL;
-			}
-			//Remove the request
-			request_list.erase_after(prev);
-		}
-	}
-	#endif
+	// #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
+	// if(evt == SM_RESPONSE_EVENT || evt == SM_WRITE_EVENT){
+	// 	//Check that is this a response from a registered request before ?
+	// 	request_list_iterator prev = check_incoming_response(packet);
+	// 	if(prev != request_list.end()){
+	// 		request_list_iterator it = std::next(prev);
+	// 		if(it->fptr != NULL){
+	// 			it->fptr(ret,packet);
+	// 			//set packet to null so we are not gonna call rxevent handler since we have already invoked this function
+	// 			packet = NULL;
+	// 		}
+	// 		//Remove the request
+	// 		request_list.erase_after(prev);
+	// 	}
+	// }
+	// #endif
 
-	if(packet != NULL && evt == SM_REQUEST_EVENT && packet->message_id >= SMCOM_SPECIAL_MESSAGE_START_ID){
-		if(ret != SMCOM_STATUS_CRC_ERROR){
-			respond_smcom_special_messages(packet);
-			//Quietly return default like we had no messages
-			ret = SMCOM_STATUS_DEFAULT;
-			//set packet to null so we are not gonna call rxevent handler since we have already invoked this function
-		}
-		packet = NULL;
+	bool notify_rx_callback = true;
+
+	if(packet != NULL && packet->message_type == SMCom_message_types::REQUEST_ACK){
+		smcom_log("Got write ack event, notify we got the data\n");
+		notify_rx_callback = false;
+		response_ack(packet,NULL,0); //Returning response to request
 	}
 
-	if(packet != NULL){
+	if(packet != NULL && packet->message_type == SMCom_message_types::RESPONSE_ACK){
+		notify_rx_callback = false;
+		//Leave it as it is, write_ack will handle it
+	}
+
+		//Rx buffer contains the data, responsible ack handler will use it!
+	// if(packet != NULL && event == SM_REQUEST_EVENT && packet->message_id >= SMCOM_SPECIAL_MESSAGE_START_ID){
+	// 	if(ret != SMCOM_STATUS_CRC_ERROR){
+	// 		respond_smcom_special_messages(packet);
+	// 		//Quietly return default like we had no messages
+	// 		ret = SMCOM_STATUS_DEFAULT;
+	// 		//set packet to null so we are not gonna call rxevent handler since we have already invoked this function
+	// 	}
+	// 	notify_rx_callback = false;
+	// }
+
+	if(notify_rx_callback){
 		if(rx_event_handler_callback_ptr == NULL){
-			__rx_callback__(evt,ret,packet);
+			__rx_callback__(event,ret,packet);
 		}
 		else{
-			rx_event_handler_callback_ptr(evt,ret,packet);
+			rx_event_handler_callback_ptr(event,ret,packet);
 		}
 	}
 
@@ -578,6 +449,7 @@ template<typename T>
 SMCom_Status_t SMCom<T>::listener(void){
 	uint16_t len = HEADER_SIZE;
 	
+	T in_packet = const_com_packet;
 
 	SMCom_Status_t status = SMCOM_STATUS_DEFAULT;
 	size_t avlb = __available__();
@@ -592,7 +464,7 @@ SMCom_Status_t SMCom<T>::listener(void){
 		status = __read__(ptr,HEADER_SIZE-1);
 		ptr--;
 		if(status == SMCOM_STATUS_SUCCESS){
-			status = common_verify_message_header(ptr, &len,false);
+			status = common_verify_message_header(&in_packet,ptr, &len,false);
 		}
 		if(is_packet_broken(status)) return status;
 		ptr += HEADER_SIZE;
@@ -694,4 +566,16 @@ uint16_t SMCom<T>::get_crc_ibm(const uint8_t * buffer, uint8_t len,uint16_t crc)
 		crc = compute_crc_ibm(crc,buffer[i]);
 	}
 	return crc;
+}
+
+// ########################## Version 2 ##############################
+
+template<typename T>
+SMCom_Status_t SMCom<T>::__lock__(uint32_t timeout){
+	return SMCOM_STATUS_SUCCESS;
+}
+
+template<typename T>
+void SMCom<T>::__unlock__(){
+	;
 }
