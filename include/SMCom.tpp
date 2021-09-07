@@ -74,7 +74,7 @@ SMCom_Status_t SMCom<T>::common_finalize_queue(T * out_packet, uint8_t retry){
 
 	uint8_t last_bytes[3] = {(uint8_t)((last_crc>>8)&0x00FF), (uint8_t)(last_crc & 0x00FF), MESSAGE_END};
 	
-	ret = __write__(last_bytes,3,retry);
+	ret = __write__retry(last_bytes,3,retry);
 	if(ret != SMCOM_STATUS_SUCCESS){
 		return ret;
 	}
@@ -483,7 +483,7 @@ template<typename T>
 SMCom_Status_t SMCom<T>::__write__retry(const uint8_t * buffer, uint8_t len, uint8_t retry){
 	SMCom_Status_t ret = SMCOM_STATUS_DEFAULT;
 	for(uint8_t i = 0; i<retry; ++i){
-		if( (ret = __write__(buffer,len)) != SMCOM_STATUS_SUCCESS){
+		if( (ret = __write__(buffer,len)) == SMCOM_STATUS_SUCCESS){
 			return ret;
 		}
 	}
