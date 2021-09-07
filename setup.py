@@ -3,14 +3,19 @@
 
 #Required packages
 # - pybind11
-# - pyserial
-
 
 import os,sys
 import subprocess
 import pathlib
 from distutils import spawn
 from setuptools import setup, find_packages, Extension
+
+
+try:
+	import pybind11
+except ImportError:
+	if subprocess.call([sys.executable, '-m', 'pip', 'install', 'pybind11']):
+		raise RuntimeError('pybind11 install failed.')
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 from pybind11 import get_cmake_dir
@@ -86,11 +91,11 @@ setup(
     zip_safe=False,
 	python_requires=">=3.6",
 	install_requires=[
-		"pyserial==3.5",
 		"pybind11==2.7.0",
 	],
 	setup_requires=[
 		"setuptools>=42",
+		"pybind11==2.7.0",
 		"wheel",
 	]
 )

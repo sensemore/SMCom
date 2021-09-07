@@ -34,15 +34,12 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     
     uint8_t default_txbuffer[1024] = {0};
     uint8_t default_rxbuffer[1024] = {0};
+    const uint8_t write_retry_amount = 5;
 
     public:
 
     // py_smcom_tramp(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : SMCom::SMCom(rx_buf_size, tx_buf_size, id, NULL, NULL){;}
 	explicit py_smcom_tramp(uint8_t id) : SMCom::SMCom(default_rxbuffer, 1024, default_txbuffer, 1024, id, NULL, NULL){
-        //7_rxvec.reserve(1024);
-        //this->rx_buffer = _rxvec.data();
-        smcom_log("%s : this=%p\n",__func__,this);
-        smcom_log("%s : rx_buffer=%p\n",__func__,default_rxbuffer);
     }
     ~py_smcom_tramp(){
         smcom_log("Desctructor worked!\n");
@@ -56,7 +53,7 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
 
 
     SMCom_Status_t write(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::write(receiver_id, message_id, buffer.data(), len);
+        return SMCom<SMCOM_PUBLIC>::write(receiver_id, message_id, buffer.data(), len, write_retry_amount);
     }
 
     SMCom_Status_t handle_message_data(std::vector<uint8_t> buffer, uint16_t len){
@@ -64,11 +61,7 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     }
 
     SMCom_Status_t push_to_queue(std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::push_to_queue(buffer.data(), len);
-    }
-
-    SMCom_Status_t respond(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::respond(receiver_id, message_id, buffer.data(), len);
+        return SMCom<SMCOM_PUBLIC>::push_to_queue(buffer.data(), len, write_retry_amount);
     }
 
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) override {
@@ -92,7 +85,7 @@ class py_smcom_tramp : public SMCom<SMCOM_PUBLIC>{
     }
 
     SMCom_Status_t write_public(uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len){
-        return SMCom<SMCOM_PUBLIC>::write_public(message_id, buffer.data(), len);
+        return SMCom<SMCOM_PUBLIC>::write_public(message_id, buffer.data(), len, write_retry_amount);
     }
 
     void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC* packet){
@@ -125,7 +118,6 @@ public:
     // PySMCOM(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t id) : tramp(rx_buf_size, tx_buf_size, id){;}
     explicit PySMCOM(uint8_t id) : tramp(id){;}
     ~PySMCOM(){
-        smcom_log("Desctructor worked!\n");
     };
     
     SMCom_Status_t __write__(std::vector<uint8_t> buffer, uint16_t len) override {
@@ -251,8 +243,8 @@ PYBIND11_MODULE(SMComPy, m) {
         .def_property_readonly_static("HEADER_SIZE", [](py::object) { return py_smcom_tramp::HEADER_SIZE;})
         .def_property_readonly_static("MAX_MSG_LENGTH", [](py::object) { return py_smcom_tramp::MAX_MSG_LENGTH;})
         .def("write", static_cast<SMCom_Status_t (py_smcom_tramp::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&py_smcom_tramp::write), "(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
-        .def("respond", static_cast<SMCom_Status_t (py_smcom_tramp::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&py_smcom_tramp::respond),"(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
-        .def("start_write_queue", static_cast<SMCom_Status_t (py_smcom_tramp::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t)>(&py_smcom_tramp::start_write_queue),"(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len) -> SMCom_Status_T")
+        //.def("respond", static_cast<SMCom_Status_t (py_smcom_tramp::*)(uint8_t, uint8_t, std::vector<uint8_t>, uint8_t)>(&py_smcom_tramp::respond),"(uint8_t receiver_id, uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
+        .def("start_write_queue", static_cast<SMCom_Status_t (py_smcom_tramp::*)(SMCom_message_types, uint8_t, uint8_t, uint8_t, uint8_t)>(&py_smcom_tramp::start_write_queue),"(SMCom_message_types t, uint8_t receiver_id, uint8_t message_id, uint8_t len) -> SMCom_Status_T")
         .def("write_public", static_cast<SMCom_Status_t (py_smcom_tramp::*)(uint8_t, std::vector<uint8_t>, uint8_t)>(&py_smcom_tramp::write_public),"(uint8_t message_id, std::vector<uint8_t> buffer, uint8_t len) -> SMCom_Status_t")
         .def("assign_new_id", &py_smcom_tramp::assign_new_id,"(uint8_t id) -> void");
 }
