@@ -16,10 +16,14 @@
 
 #ifdef __GNUC__
 #define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
+#define PACKET_DATA_LEN (0)
+#define SIZEOF_PACKET(T) (sizeof(T))
 #endif
 
 #ifdef _MSC_VER
 #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop))
+#define PACKET_DATA_LEN (1)
+#define SIZEOF_PACKET(T) (sizeof(T)-1)
 #endif
 
 //#ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
@@ -39,7 +43,7 @@
 #define SMCOM_MAJOR_VERSION__ 	1
 #define SMCOM_MINOR_VERSION__ 	0
 #define SMCOM_PATCH_LEVEL__ 	1
-#define SMCOM_VERSION_STRING	"1.0.1"
+#define SMCOM_VERSION_STRING	"1.0.2"
 #define SMCOM_VERSION ((SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__)
 #define MAX_RETRY_FOR_WRITE 5
 /*
@@ -81,7 +85,8 @@ PACK(struct smcom_private_t{
 	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63
-	uint8_t data[1];			//<! Data pointer for derived classes
+	uint8_t data[PACKET_DATA_LEN];			//<! Data pointer for derived classes
+	
 });
 typedef struct smcom_private_t SMCOM_PRIVATE;
 
@@ -94,7 +99,7 @@ PACK(struct smcom_public_4bit_adr{
 	uint8_t transmitter_id:4;	//<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[1];			//<! Data pointer for derived classes
+	uint8_t data[PACKET_DATA_LEN];			//<! Data pointer for derived classes
 });
 typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
 
@@ -107,7 +112,7 @@ PACK(struct smcom_public_8bit_adr{
 	uint8_t transmitter_id;		//<! Transmitter id in the communication can take value between 0-253 (254 and 255 is reserved)
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[1];			//<! Data pointer for derived classes
+	uint8_t data[PACKET_DATA_LEN];			//<! Data pointer for derived classes
 });
 typedef struct smcom_public_8bit_adr SMCOM_PUBLIC_8BIT_ADDRESS;
 
@@ -120,7 +125,7 @@ PACK(struct smcom_public_custom_adr{
 	uint8_t transmitter_id[SMCOM_CUSTOM_ADDRESS];
 	uint8_t message_type:2;
 	uint8_t message_id:6;
-	uint8_t data[0];
+	uint8_t data[PACKET_DATA_LEN];
 });
 typedef struct smcom_public_custom_adr SMCOM_PUBLIC_CUSTOM_ADDRESS;
 #endif
@@ -319,7 +324,7 @@ public:
 		return str_SMCom_Status_t[t];
 	}
 
-	static const uint8_t HEADER_SIZE = sizeof(CT)+1;
+	static const uint8_t HEADER_SIZE = SIZEOF_PACKET(CT)+1;
 	static const uint8_t MAX_MSG_LENGTH = 0xFF;
 
 protected:
@@ -373,9 +378,6 @@ private:
 	request_list_iterator check_incoming_response(CT * inc_packet);
 	SMCom_Status_t register_request(uint32_t timeout, request_response_callback fptr);
 	#endif
-
-
-	
 
 	uint8_t * rx_buffer = NULL;
 	uint16_t rx_iter = 0;

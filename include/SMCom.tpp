@@ -45,7 +45,7 @@ typename SMCom<T>::request_list_iterator SMCom<T>::get_request(T * packet){
 		auto nextit = std::next(it);
 		do{
 			uint8_t * p2 = ((uint8_t*)(&nextit->packet)) + 1; //Again do not compare the data_len which could be different
-			if(memcpy(ptr,p2,sizeof(T)-1) == 0){
+			if(memcpy(ptr,p2,SIZEOF_PACKET(T)-1) == 0){
 				//NOTICE THAT ITERATOR RETURNS ONE ITEM BEFORE THE FOUND OBJECT TO USE ERASE AFTER FUNCTION, USE IT WITH CARE
 				return it;
 			}
@@ -167,9 +167,9 @@ SMCom_Status_t SMCom<T>::common_start_write_queue(uint8_t retry){
 
 	txflag.start_byte_flag = 1;
 	//Msg sequence
-	last_crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),last_crc);
+	last_crc = get_crc_ibm((uint8_t *)&com_packet,SIZEOF_PACKET(com_packet),last_crc);
 	
-	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	ret = __write__retry((uint8_t *)&com_packet,SIZEOF_PACKET(com_packet),retry);
 	
 	txflag.rx_tx_id_flag = 1;
 
@@ -241,8 +241,8 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
 
-	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
-	uint16_t possible_packet_size = sizeof(T) + 4 + len;
+	//packet data + start byte + end byte + crc (2) = SIZEOF_PACKET(packet) + 4
+	uint16_t possible_packet_size = SIZEOF_PACKET(T) + 4 + len;
 
 	if(packet_size > 0){
 		if(packet_size >= possible_packet_size){
@@ -260,8 +260,8 @@ SMCom_Status_t SMCom<T>::common_write_txbuffer(const uint8_t * buffer, uint8_t l
 	tx_buffer[txit++] = MESSAGE_START;
 	txflag.start_byte_flag = 1;
 
-	memcpy(tx_buffer+txit,(uint8_t *)&com_packet,sizeof(com_packet));
-	txit += sizeof(com_packet);
+	memcpy(tx_buffer+txit,(uint8_t *)&com_packet,SIZEOF_PACKET(com_packet));
+	txit += SIZEOF_PACKET(com_packet);
 	txflag.rx_tx_id_flag = 1;
 
 	if(len > 0){
@@ -300,8 +300,8 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	uint16_t crc = CRC_IBM_SEED;
 	com_packet.data_len = len;
 
-	//packet data + start byte + end byte + crc (2) = sizeof(packet) + 4
-	uint16_t possible_packet_size = sizeof(T) + 4 + len;
+	//packet data + start byte + end byte + crc (2) = SIZEOF_PACKET(packet) + 4
+	uint16_t possible_packet_size = SIZEOF_PACKET(T) + 4 + len;
 	if(packet_size > 0){
 		if(packet_size >= possible_packet_size){
 			//Tell receiver that this packet has padding bytes
@@ -325,10 +325,10 @@ SMCom_Status_t SMCom<T>::common_write_polling(const uint8_t * buffer, uint8_t le
 	txflag.start_byte_flag = 1;
 
 	//Msg sequence
-	crc = get_crc_ibm((uint8_t *)&com_packet,sizeof(com_packet),crc);
+	crc = get_crc_ibm((uint8_t *)&com_packet,SIZEOF_PACKET(com_packet),crc);
 	
 	
-	ret = __write__retry((uint8_t *)&com_packet,sizeof(com_packet),retry);
+	ret = __write__retry((uint8_t *)&com_packet,SIZEOF_PACKET(com_packet),retry);
 	if(ret != SMCOM_STATUS_SUCCESS){
 		return ret;
 	}
@@ -644,7 +644,7 @@ void SMCom<T>::set_fixed_packet_size(uint16_t packet_size){
 
 template<typename CT>
 CT * SMCom<CT>::duplicate_message_packet(const CT * packet){
-	uint16_t sz = sizeof(CT) + packet->data_len;
+	uint16_t sz = SIZEOF_PACKET(CT) + packet->data_len;
 	CT * p = (CT *) malloc(sz);
 	if(p != NULL){
 		memcpy(p,packet,sz);

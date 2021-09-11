@@ -16,12 +16,13 @@ SMCom_Status_t public_node::__write__(const uint8_t * buffer, uint16_t len){
     
     if(buffer == NULL) return SMCOM_STATUS_FAIL;
     for(uint16_t i = 0; i<len; ++i){
-        if(i != 3){
+        
+        if(1 || i != 3){
             write_queue.push(buffer[i]);
         }
         else{
             //CRC error must invoke!
-            write_queue.push(0xAB);
+            //write_queue.push(0xAB);
         }
 
         
