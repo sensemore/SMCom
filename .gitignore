@@ -14,3 +14,30 @@ dist/
 
 .vscode/*
 *.code-workspace
+
+
+# Distribution / packaging
+bin/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+.eggs/
+
+# ignore all . files and . folders
+.*
+
+# Dont ignore .gitignore (this file)
+# This is just for verbosity, you can leave it out if
+# .gitignore is already tracked or if you use -f to
+# force-add it if you just created it
+!/.gitignore

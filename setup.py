@@ -76,7 +76,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name=module_name,
-    version="1.0.1",
+    version="1.0.2",
     author="sensemore",
 	author_email="hello@sensemore.io",
     url="https://www.sensemore.io",
