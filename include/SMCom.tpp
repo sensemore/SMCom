@@ -668,6 +668,12 @@ void SMCom<T>::clear_rx_flag(){
 	memset(&rxflag,0,sizeof(message_flags));
 }
 
+
+template<typename T>
+void SMCom<T>::clear_configuration_flags(){
+	memset(&conflag,0,sizeof(configuration_flags));
+}
+
 template<typename T>
 uint64_t SMCom<T>::GET_SMCOM_VERSION(){
 	return SMCOM_VERSION;

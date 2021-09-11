@@ -24,6 +24,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event
 
 	clear_rx_flag();
 	clear_tx_flag();
+	clear_configuration_flags();
 }
 
 template<>
@@ -41,6 +42,7 @@ SMCom<SMCOM_PRIVATE>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t *
 
 	clear_rx_flag();
 	clear_tx_flag();
+	clear_configuration_flags();
 }
 
 
@@ -176,6 +178,7 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 
 	clear_rx_flag();
 	clear_tx_flag();
+	clear_configuration_flags();
 }
 
 template<>
@@ -196,6 +199,7 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 
 	clear_rx_flag();
 	clear_tx_flag();
+	clear_configuration_flags();
 }
 
 template<>

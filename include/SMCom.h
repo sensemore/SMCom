@@ -13,6 +13,15 @@
 #include <cstdint>
 #include <cstring>
 
+
+#ifdef __GNUC__
+#define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
+#endif
+
+#ifdef _MSC_VER
+#define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop))
+#endif
+
 //#ifndef SMCOM_CONFIG_DISABLE_REQUEST_RESPONSE
 //#define SMCOM_CONFIG_REQUEST_RESPONSE
 //#endif
@@ -68,51 +77,51 @@ struct some_struct{
 
 //like uart, rx-tx are connected to only two devices. Buffer does not contain receiver id or transmitter id
 // adds 6-bytes to message packet including start byte, end byte crc etc.
-struct smcom_private_t{
+PACK(struct smcom_private_t{
 	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63
-	uint8_t data[0];			//<! Data pointer for derived classes
-}__attribute__((packed));
+	uint8_t data[1];			//<! Data pointer for derived classes
+});
 typedef struct smcom_private_t SMCOM_PRIVATE;
 
 
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 4bits which can only support 15 devices, 0 for public
 // adds 7-bytes to message packet including start byte, end byte crc etc.
-struct smcom_public_4bit_adr{
+PACK(struct smcom_public_4bit_adr{
 	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
 	uint8_t receiver_id:4;		//<! Receiver id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0b0000xxxx
 	uint8_t transmitter_id:4;	//<! Transmitter id in the communication can take value between 0-13 (14 and 15 is reserved), located at 0bxxxx0000
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[0];			//<! Data pointer for derived classes
-}__attribute__((packed));
+	uint8_t data[1];			//<! Data pointer for derived classes
+});
 typedef struct smcom_public_4bit_adr SMCOM_PUBLIC;
 
 
 //like rs485, rx-tx are connected to multiple devices. Buffer contains rx id, tx id 8bits, which can only support 255 devices, 255 for public, 254 is default id
 // adds 8-bytes to message packet including start byte, end byte crc etc.
-struct smcom_public_8bit_adr{
+PACK(struct smcom_public_8bit_adr{
 	uint8_t data_len;			//<! Data len in the packet, user can use this instead defining data length in the message max data length is 255
 	uint8_t receiver_id;		//<! Receiver id in the communication can take value between 0-253 (254 and 255 is reserved)
 	uint8_t transmitter_id;		//<! Transmitter id in the communication can take value between 0-253 (254 and 255 is reserved)
 	uint8_t message_type:2;		//<! Message type , can be write/request/response/indicate etc. User does not change this max value is 3, located at 0b000000xx
 	uint8_t message_id:6;		//<! Message id is defined by the user similar to uuid in BLE communication. Max value is 63, located at 0bxxxxxx00
-	uint8_t data[0];			//<! Data pointer for derived classes
-}__attribute__((packed));
+	uint8_t data[1];			//<! Data pointer for derived classes
+});
 typedef struct smcom_public_8bit_adr SMCOM_PUBLIC_8BIT_ADDRESS;
 
 #ifdef SMCOM_CONFIG_CUSTOM_ADDRESS
 //user can define any address byte
 // adds 6-bytes + 2*custom_address_size to message packet including start byte, end byte crc etc.
-struct smcom_public_custom_adr{
+PACK(struct smcom_public_custom_adr{
 	uint8_t data_len;
 	uint8_t receiver_id[SMCOM_CUSTOM_ADDRESS];
 	uint8_t transmitter_id[SMCOM_CUSTOM_ADDRESS];
 	uint8_t message_type:2;
 	uint8_t message_id:6;
 	uint8_t data[0];
-}__attribute__((packed));
+});
 typedef struct smcom_public_custom_adr SMCOM_PUBLIC_CUSTOM_ADDRESS;
 #endif
 
@@ -196,9 +205,12 @@ enum SMCom_special_messages : uint8_t{
 };
 
 
-typedef struct smcom_message_get_version_struct__{
+PACK(struct smcom_message_get_version_struct__{
 	uint32_t version;
-}__attribute__((packed)) smcom_message_get_version_struct__;
+});
+
+
+typedef smcom_message_get_version_struct__ smcom_message_get_version_struct__;
 
 
 
@@ -314,6 +326,7 @@ protected:
 
 	void clear_tx_flag();
 	void clear_rx_flag();
+	void clear_configuration_flags();
 
 private:
 
@@ -362,7 +375,7 @@ private:
 	#endif
 
 
-	CT com_packet;
+	
 
 	uint8_t * rx_buffer = NULL;
 	uint16_t rx_iter = 0;
@@ -371,7 +384,7 @@ private:
 	uint8_t * tx_buffer = NULL;
 	uint16_t tx_buf_size = 0;
 
-	configuration_flags conflag = (configuration_flags){0};
+	configuration_flags conflag;
 
 	uint16_t message_end_index;
 
@@ -397,6 +410,8 @@ private:
 
 	uint16_t compute_crc_ibm(uint16_t crc, uint8_t data);
 	uint16_t get_crc_ibm(const uint8_t * buffer, uint8_t len, uint16_t crc = CRC_IBM_SEED);
+
+	CT com_packet;
 };
 
 
