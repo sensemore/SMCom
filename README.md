@@ -5,9 +5,11 @@ This repository provides different implementation in C++ and Python.
 
 SMCom provides node-to-node communication (public-addressable) or private communication from one device to another (private-no address).
 
-**Why use SMCom ?**
-- Easy to implement for many devices
-- Low memory budget
+SMCom requires functions to handle communication channel which are write & read functions and two callbacks for user to define.
+
+**SMCom :**
+- Easy to implement for many devices (ESP32, Arduino, Raspberry-Pi)
+- Low memory budget (User can define the )
 - CRC check on messages so data loss can be detected and recovered
 - Provides cross platform communication mainly for embedded devices
 
@@ -19,7 +21,7 @@ We provide pip package to download easily on Linux and Windows platforms.
 	pip install SMComPy
 ```
 
-To see python example: [SMWiredPY](https://github.com/sensemore/SMWiredPy)
+To see a python example: [SMWiredPY](https://github.com/sensemore/SMWiredPy)
 
 ## API for C++
 
@@ -37,10 +39,11 @@ Two addresses are predefined and cannot be used, so up to 14 node-to-node commun
 - **0x0F** is used for public address
 
 SMCOM_PUBLIC frame :
-
 ![](./img/smcom_wired_protocol-en.svg)
 
-Example class definition
+SMCOM_PRIVATE frame is the same as above but without transmitter and receiver address fields.
+
+Example class declaration
 ```cpp
 class my_device : public SMCom<SMCOM_PUBLIC>{
 public:
@@ -54,6 +57,11 @@ public:
 ```
 
 Now my_device became a communication class and my_device objects can be used to communication over the channel
+
+```cpp
+my_device.write() //To send a message
+my_device.listener() //Can be called inside a while(1) loop or can be called after a byte received event if any
+```
 
 ### SMCom public functions
 
@@ -119,7 +127,7 @@ SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 size_t __available__();
 ```
 
-_Note : `__write__` definition is mandatory! but `__read__` and `__available__` are both left for user's choice, yet SMCom `listener` function requires read and available functions so if `listener` will be used, the definition of `__read__` and `__available__` are necessary to implement._
+_Note : `__write__`, `__read__` and `__available__` definition is mandatory!, SMCom `listener` function requires read and available functions so if `listener` will be used, the definition of `__read__` and `__available__` are necessary to implement._
 
 - `__rx_callback__`, when bytes are read and message is decoded internal library calls this function to notify user there is a message on the network. The incoming message can be accessed via 
 `const SMCOM_PUBLIC * packet` variable.
@@ -141,6 +149,7 @@ A Serial library in different languages are good example to provide and see how 
 
 ```cpp
 SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len){
+	//We write to the serial
 	if(Serial.write(buffer, len) == len){
 		return SMCom_Status_t::SUCCESS;
 	}
@@ -148,7 +157,6 @@ SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len){
 }
 ```
 ```cpp
-
 SMCom_Status_t __read__(const uint8_t * buffer, uint16_t len){
 	//We read from the serial
 	if(Serial.readBytes(buffer, len) == len){
