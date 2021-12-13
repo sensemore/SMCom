@@ -282,9 +282,9 @@ public:
 	CT * duplicate_message_packet(const CT * packet);
 
 	virtual SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len) = 0;
-	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
-	virtual size_t __available__();
-	//In order to call listener user must provide __read__ and __available__ functions
+	virtual SMCom_Status_t __read__(uint8_t * buffer, uint16_t len) = 0;
+	virtual size_t __available__() = 0;
+	//In order to call listener, user must provide __read__ and __available__ functions
 	SMCom_Status_t listener(void);
 
 	bool is_packet_broken(SMCom_Status_t stat){
