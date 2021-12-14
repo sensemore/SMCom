@@ -1,4 +1,58 @@
 //COMMON
+
+template<typename T>
+SMCom<T>::SMCom(rx_event_handler_callback rx, tx_event_handler_callback tx){
+	
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
+}
+
+template<typename T>
+SMCom<T>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
+	this->rx_buffer = rx_buffer;
+	this->tx_buffer = tx_buffer;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
+
+	conflag.static_buffer_provided = true;
+
+	clear_rx_flag();
+	clear_tx_flag();
+	clear_configuration_flags();
+}
+
+
+template<typename T>
+SMCom<T>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx){
+	
+	rx_buffer = new uint8_t[rx_buf_size];
+	tx_buffer = (tx_buf_size > 0) ? new uint8_t[tx_buf_size] : NULL;
+
+	this->rx_buf_size = rx_buf_size;
+	this->tx_buf_size = tx_buf_size;
+
+	rx_event_handler_callback_ptr = rx;
+	tx_event_handler_callback_ptr = tx;
+
+	clear_rx_flag();
+	clear_tx_flag();
+	clear_configuration_flags();
+}
+
+
+
+template<typename T>
+SMCom<T>::~SMCom(){
+	if(!conflag.static_buffer_provided){
+		delete[] rx_buffer;
+		delete[] tx_buffer;
+	}
+}
+
 #ifdef SMCOM_CONFIG_REQUEST_RESPONSE
 template<typename T>
 void SMCom<T>::increase_ms_timer(){

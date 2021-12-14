@@ -1,15 +1,15 @@
 # SMCom
 
-SMCom is a communication protocol can work on data link-layer such as UART,SPI or any wireless link-layer communications.
+SMCom is a communication protocol can work on data link-layer such as UART, SPI or any wireless link-layer communications.
 This repository provides different implementation in C++ and Python.
 
-SMCom provides node-to-node communication (public-addressable) or private communication from one device to another (private-no address).
+SMCom provides node-to-node communication (public-addressable) or private communication from one device to another (private-no address). Users can implement their own communication frame if SMCom's native frames are not adequate.
 
-SMCom requires functions to handle communication channel which are write & read functions and two callbacks for user to define.
+SMCom requires functions to handle communication channel, which are write & read functions and two callbacks, for user to define.
 
 **SMCom :**
-- Easy to implement for many devices (ESP32, Arduino, Raspberry-Pi)
-- Low memory budget (User can define the )
+- Easy to implement for many devices (Communication between embedded devices or embedded to computers such as ESP32, Arduino boards, Raspberry pi etc.)
+- Low memory budget (User can define their internal buffers)
 - CRC check on messages so data loss can be detected and recovered
 - Provides cross platform communication mainly for embedded devices
 
@@ -18,10 +18,10 @@ SMCom requires functions to handle communication channel which are write & read 
 We provide pip package to download easily on Linux and Windows platforms.
 
 ```bash
-	pip install SMComPy
+pip install SMComPy
 ```
 
-To see a python example: [SMWiredPY](https://github.com/sensemore/SMWiredPy)
+To see a python example: [SMWiredPy](https://github.com/sensemore/SMWiredPy)
 
 ## API for C++
 
@@ -29,25 +29,78 @@ In order to implement SMCom in C++ projects, see /test folder how to add librari
 
 SMCom class is a template class implementation which allows to create custom communication frames or provides common scenarios. Two common scenarios is implemented and can be inherited to a new communication class, see an example below.
 
-In order to use the library, a new class must be defined which is inherited from `SMCom<SMCOM_PUBLIC>` or `SMCom<SMCOM_PRIVATE>` types.
+In order to use the library, a new class must be defined which is inherited from `SMCom<SMCOM_PUBLIC>` or `SMCom<SMCOM_PRIVATE>` types, or can be defined with desired fields.
 
-- SMCOM_PUBLIC uses 4-bit addresses for receiver and transmitters. In 4-bit address scheme (available 2^4 = 16  communication nodes) 
-Two addresses are predefined and cannot be used, so up to 14 node-to-node communication SMCOM_PUBLIC can be used.
+### SMCom frames
 
-- **0x00-0x0D** user defined
-- **0x0E** is used for default address
-- **0x0F** is used for public address
 
-SMCOM_PUBLIC frame :
-![](./img/smcom_wired_protocol-en.svg)
+1. SMCOM_PUBLIC FRAME
+	
 
+```cpp
+//SMCOM_PUBLIC frame
+  1B    1B        4bit       4bit    6bit    2bit       1B     1B    1B
+┌─────┬──────┬───────────┬────────┬───────┬───────┬────┬─────┬─────┬─────┐
+│Start│Data  │Transmitter│Receiver│Message│Message│Data│CRC-H│CRC-L│End  │
+│Byte │Length│    ID     │   ID   │ Index │  Type │    │     │     │Byte │
+└─────┴──────┴───────────┴────────┴───────┴───────┴────┴─────┴─────┴─────┘
+ 0xFB  0-255     0-13       0-13    0-60     ..     ..   ..     ..   0xBF
+```
+  * Start byte and end byte are both fixed
+  * Data length is 1 byte so up to 255 bytes can be send in one SMCom packet
+  * Address field
+    - SMCOM_PUBLIC uses 4-bit addresses for receiver and transmitters. In 4-bit address scheme (available 2^4 = 16  communication nodes) 
+  Two addresses are predefined and cannot be used, so up to 14 node-to-node communication SMCOM_PUBLIC can be used.
+
+    - **0x00-0x0D** user defined
+    - **0x0E** is used for default address (reserved)
+    - **0x0F** is used for public address (reserved)
+
+  * Message index is 6-bit and some of them are reserved for internal SMCom communications, 60 message id is allowed for users
+
+See [public_node](./examples/cpp/public_node.cpp) for more examples and sample codes
+
+
+
+2. SMCOM_PRIVATE FRAME
+   
 SMCOM_PRIVATE frame is the same as above but without transmitter and receiver address fields.
+See [private_node](./examples/cpp/private_node.cpp) for more examples and sample codes
+```cpp
+//SMCOM_PRIVATE
+  1B    1B      6bit    2bit       1B     1B    1B
+┌─────┬──────┬───────┬───────┬────┬─────┬─────┬─────┐
+│Start│Data  │Message│Message│Data│CRC-H│CRC-L│End  │
+│Byte │Length│ Index │  Type │    │     │     │Byte │
+└─────┴──────┴───────┴───────┴────┴─────┴─────┴─────┘
+ 0xFB  0-255   0-60    ..      ..   ..     ..   0xBF
+```
+
+3. CUSTOM FRAME
+
+Since SMCom is a template library, it supports custom headers.
+Users can put whatever they want in the frame and can send their own packets and configurations etc.
+You may put random numbers, preambles or addresses etc. In the below picture some fields are requisite, other than custom header field, since SMCom needs to handle messages, data lengths etc.
+```cpp
+//Custom packet definition
+  1B    1B      6bit    2bit                              1B     1B    1B
+┌─────┬──────┬───────┬───────┬──────────────────────┬────┬─────┬─────┬─────┐
+│Start│Data  │Message│Message│  Custom header field │Data│CRC-H│CRC-L│End  │
+│Byte │Length│ Index │  Type │    (user defined)    │    │     │     │Byte │
+└─────┴──────┴───────┴───────┴──────────────────────┴────┴─────┴─────┴─────┘
+  0xFB  0-255   0-60   ...                            ..   ..     ..   0xBF
+
+```
+
+See [custom_node](./examples/cpp/custom_node.cpp) for more examples and sample codes
+
+
 
 Example class declaration
 ```cpp
 class my_device : public SMCom<SMCOM_PUBLIC>{
 public:
-    my_device(uint16_t rx_buffer_size, uint16_t tx_buffer_size, uint8_t id, SMCom::rx_event_handler_callback rx, SMCom::tx_event_handler_callback tx,std::string name);
+    my_device(uint16_t rx_buffer_size, uint16_t tx_buffer_size, uint8_t id);
     SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
 	SMCom_Status_t __read__(uint8_t * buffer, uint16_t len);
 	size_t __available__();
@@ -59,8 +112,9 @@ public:
 Now my_device became a communication class and my_device objects can be used to communication over the channel
 
 ```cpp
-my_device.write() //To send a message
-my_device.listener() //Can be called inside a while(1) loop or can be called after a byte received event if any
+my_device my_device_object(1024,1024,0x0B); //Now the current device address is 0x0B
+my_device_object.write(0x0A,buffer,len) //To send a message 0x0A
+my_device_object.listener() //Can be called inside a while(1) loop or can be called after a byte received event if any
 ```
 
 ### SMCom public functions
@@ -111,7 +165,7 @@ SMCom requires some main functions to write to actual port, or read from the por
 These functions are specifically defined in two underscores such as `__FunctionName___`.
 
 - `__write__`, this function writes the desired data to actual communication channel.
-  **SMCom requires child class to override this function!**.
+  **SMCom requires child class to override this function!**
   For example if SMCom is used over UART, in user's new defined `__write__` function serial.write function must be called.
 ```cpp
 SMCom_Status_t __write__(const uint8_t * buffer, uint16_t len);
@@ -172,7 +226,7 @@ size_t __available__(){
 }
 ```
 ```cpp
-void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+void __rx_callback__(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
     printf("Packet length %d\n",packet->data_len);
 	printf("Message Id:[%d] invoked! Transmitter id[%d], Receiver id[%d]\n",packet->message_id,packet->transmitter_id,packet->receiver_id);
 	uint8_t * data = packet->data;
@@ -183,6 +237,4 @@ void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t st
     }
 }
 ```
-
 SMCom is developed by [Sensemore](www.sensemore.io)
-

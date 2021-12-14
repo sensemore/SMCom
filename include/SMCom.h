@@ -242,6 +242,7 @@ public:
 	//Constructors with static buffers
 	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, rx_event_handler_callback rx, tx_event_handler_callback tx);
 	SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, uint16_t tx_buf_size, uint8_t id, rx_event_handler_callback rx, tx_event_handler_callback tx);
+	SMCom(rx_event_handler_callback rx=NULL, tx_event_handler_callback tx=NULL);
 	~SMCom();
 
 	SMCom_Status_t verify_message_header(const uint8_t * raw_bytes, uint16_t * len);
@@ -333,7 +334,8 @@ protected:
 	void clear_rx_flag();
 	void clear_configuration_flags();
 
-private:
+	CT com_packet;
+
 
 	SMCom_Status_t __write__retry(const uint8_t * buffer, uint8_t len, uint8_t retry=1);
 
@@ -413,7 +415,6 @@ private:
 	uint16_t compute_crc_ibm(uint16_t crc, uint8_t data);
 	uint16_t get_crc_ibm(const uint8_t * buffer, uint8_t len, uint16_t crc = CRC_IBM_SEED);
 
-	CT com_packet;
 };
 
 

@@ -8,7 +8,6 @@ wiredTemp.cpp
 .bin
 *.pyc
 *.o
-
 SMComPy.egg-info
 dist/
 
