@@ -79,7 +79,7 @@ setup(
     version="1.0.2",
     author="sensemore",
 	author_email="hello@sensemore.io",
-    url="https://www.sensemore.io",
+    url="https://github.com/sensemore/SMCom",
     description="SMComPy project",
     long_description=long_description,
 	long_description_content_type="text/markdown",
@@ -98,4 +98,10 @@ setup(
 		"pybind11==2.7.0",
 		"wheel",
 	]
+
+	keywords='SMCom, sensemore, communication protocol, uart communication protocol, serial communication protocol',
+    project_urls={  # Optional
+        'Bug Reports': 'https://github.com/sensemore/SMCom/issues',
+        'Source': 'https://github.com/sensemore/SMCom',
+    },
 )
