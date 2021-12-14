@@ -76,7 +76,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name=module_name,
-    version="1.0.2",
+    version="1.0.3",
     author="sensemore",
 	author_email="hello@sensemore.io",
     url="https://github.com/sensemore/SMCom",
@@ -97,9 +97,9 @@ setup(
 		"setuptools>=42",
 		"pybind11==2.7.0",
 		"wheel",
-	]
+	],
 
-	keywords='SMCom, sensemore, communication protocol, uart communication protocol, serial communication protocol',
+	keywords="SMCom, sensemore, communication protocol, uart communication protocol, serial communication protocol",
     project_urls={  # Optional
         'Bug Reports': 'https://github.com/sensemore/SMCom/issues',
         'Source': 'https://github.com/sensemore/SMCom',

@@ -179,6 +179,8 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, uint8_t i
 	clear_rx_flag();
 	clear_tx_flag();
 	clear_configuration_flags();
+
+	conflag.static_buffer_provided = false;
 }
 
 template<>
@@ -195,11 +197,11 @@ SMCom<SMCOM_PUBLIC>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * 
 	if(id > PUBLIC_ID_4BIT) id = PUBLIC_ID_4BIT;
 	com_packet.transmitter_id = id;
 
-	conflag.static_buffer_provided = true;
-
 	clear_rx_flag();
 	clear_tx_flag();
 	clear_configuration_flags();
+
+	conflag.static_buffer_provided = true;
 }
 
 template<>

@@ -18,11 +18,11 @@ SMCom<T>::SMCom(uint8_t * rx_buffer, uint16_t rx_buf_size, uint8_t * tx_buffer, 
 	rx_event_handler_callback_ptr = rx;
 	tx_event_handler_callback_ptr = tx;
 
-	conflag.static_buffer_provided = true;
-
 	clear_rx_flag();
 	clear_tx_flag();
 	clear_configuration_flags();
+
+	conflag.static_buffer_provided = true;
 }
 
 
@@ -41,6 +41,8 @@ SMCom<T>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_cal
 	clear_rx_flag();
 	clear_tx_flag();
 	clear_configuration_flags();
+	
+	conflag.static_buffer_provided = false;
 }
 
 
