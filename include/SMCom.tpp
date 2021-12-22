@@ -49,7 +49,6 @@ SMCom<T>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_cal
 
 template<typename T>
 SMCom<T>::~SMCom(){
-	printf("Called :)\n");
 	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
