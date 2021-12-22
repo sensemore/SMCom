@@ -5,6 +5,8 @@
 
 
 int main(int argc, char const *argv[]){
+	(void)argc; //Unused params
+	(void)argv; //Unused params
 
 	//Public nodes, 
 	public_node pubn0(0x00,"node-0");

@@ -49,6 +49,7 @@ SMCom<T>::SMCom(uint16_t rx_buf_size, uint16_t tx_buf_size, rx_event_handler_cal
 
 template<typename T>
 SMCom<T>::~SMCom(){
+	printf("Called :)\n");
 	if(!conflag.static_buffer_provided){
 		delete[] rx_buffer;
 		delete[] tx_buffer;
@@ -611,13 +612,17 @@ SMCom_Status_t SMCom<T>::common_respond_smcom_special_messages(T * packet){
 
 template<typename T>
 void SMCom<T>::__rx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
-	;
+	(void)event;
+	(void)status;
+	(void)packet;
 }
 
 
 template<typename T>
 void SMCom<T>::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, const T * packet){
-	;
+	(void)event;
+	(void)status;
+	(void)packet;
 }
 
 template<typename T>

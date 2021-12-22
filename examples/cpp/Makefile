@@ -9,7 +9,7 @@ INC_FLAGS := $(addprefix -I,$(INC))
 CC = g++
 
 OPTIMIZATION_FLAG = 
-WARNING_FLAG = -Werror -Wno-error=pointer-arith 
+WARNING_FLAG = -Werror -Wextra -Wall -Wno-error=unused-parameter -Wno-error=pointer-arith 
 DEBUG_FLAG = -g
 
 CFLAGS = -c 

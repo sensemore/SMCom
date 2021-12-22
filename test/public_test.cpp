@@ -118,6 +118,8 @@ typedef struct msg_person{
 
 
 static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+    (void)event;
+    (void)status;
     printf("Packet length %d\n",packet->data_len);
     switch(packet->message_id){
         case public_messages::GREETINGS:{
@@ -142,6 +144,8 @@ static void public_rx_event_handler_callback(SMCom_event_types event, SMCom_Stat
 }
 
 static void public_tx_event_handler_callback(SMCom_event_types event, SMCom_Status_t status, const SMCOM_PUBLIC * packet){
+    (void)event;
+    (void)status;
     for(int i = 0; i < packet->data_len; i++){
         printf("%u ", packet->data[i]);
     }

@@ -144,14 +144,6 @@ typename SMCom<SMCOM_PRIVATE>::request_list_iterator SMCom<SMCOM_PRIVATE>::check
 #endif
 
 
-template<>
-SMCom<SMCOM_PRIVATE>::~SMCom(){
-	if(!conflag.static_buffer_provided){
-		delete[] rx_buffer;
-		delete[] tx_buffer;
-	}
-}
-
 //===================================================================================================================================================================================
 //SMCOM_PUBLIC
 // +----------+-----------+--------+-----------+-------+----------+----+---------+
@@ -343,14 +335,6 @@ typename SMCom<SMCOM_PUBLIC>::request_list_iterator SMCom<SMCOM_PUBLIC>::check_i
 	return 	request_list.end();
 }
 #endif
-
-template<>
-SMCom<SMCOM_PUBLIC>::~SMCom(){
-	if(!conflag.static_buffer_provided){
-		delete[] rx_buffer;
-		delete[] tx_buffer;
-	}
-}
 
 
 //======================================================================================
