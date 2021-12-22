@@ -15,6 +15,7 @@ int main(int argc, char const *argv[]){
 	public_node pubn3(0x03,"node-3");
 	public_node pubn4(0x04,"node-4");
 	
+	
 
 	//private nodes
 	private_node priv_node_A("Node-A");
@@ -29,6 +30,7 @@ int main(int argc, char const *argv[]){
 
 	uint8_t dummy_buf[] = {0,5,10,15,20,25,30};
 	custom_node_A.write(200,0,dummy_buf,sizeof(dummy_buf),1);
+	
 
 	return 0;
 }

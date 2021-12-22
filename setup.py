@@ -73,10 +73,15 @@ ext_modules = [
 with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
+#Read version from header automatically by exec function
+version = ""
+with open("./include/SMCom.h","r") as f:
+	vline = f.read().split('\n')[5] #This is constant!
+	exec(vline.replace("#define SMCOM_VERSION_STRING\t",'version='))
 
 setup(
     name=module_name,
-    version="1.0.3",
+    version=version,
     author="sensemore",
 	author_email="hello@sensemore.io",
     url="https://github.com/sensemore/SMCom",

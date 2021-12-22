@@ -1,5 +1,15 @@
 #ifndef SMCOM_H
 #define SMCOM_H
+//  SMCOM_VERSION % 100 : patch level
+//  SMCOM_VERSION / 100 % 1000 : minor version
+//  SMCOM_VERSION / 100000 : major version
+#define SMCOM_VERSION_STRING	"1.0.3"
+#define SMCOM_MAJOR_VERSION__ 	1
+#define SMCOM_MINOR_VERSION__ 	0
+#define SMCOM_PATCH_LEVEL__ 	3
+#define SMCOM_VERSION ((SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__)
+
+
 
 #ifdef SMCOM_DEBUG
 #define smcom_log(s,...) (printf("[%d-%s]" s "\n",__LINE__,__func__,##__VA_ARGS__))
@@ -37,14 +47,6 @@
 #endif
 
 
-//  SMCOM_VERSION % 100 : patch level
-//  SMCOM_VERSION / 100 % 1000 : minor version
-//  SMCOM_VERSION / 100000 : major version
-#define SMCOM_MAJOR_VERSION__ 	1
-#define SMCOM_MINOR_VERSION__ 	0
-#define SMCOM_PATCH_LEVEL__ 	4
-#define SMCOM_VERSION_STRING	"1.0.4"
-#define SMCOM_VERSION ((SMCOM_MAJOR_VERSION__ * 100000) + (SMCOM_MINOR_VERSION__ * 100) + SMCOM_PATCH_LEVEL__)
 /*
 	Some configurations macros before including this class
 	-SMCOM REQUEST-RESPONSE FLAG
