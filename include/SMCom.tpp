@@ -626,6 +626,8 @@ void SMCom<T>::__tx_callback__(SMCom_event_types event, SMCom_Status_t status, c
 
 template<typename T>
 SMCom_Status_t SMCom<T>::__read__(uint8_t * buffer, uint16_t len){
+	(void) buffer;
+	(void) len;
 	return SMCOM_STATUS_FAIL;
 }
 

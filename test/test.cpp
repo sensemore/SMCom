@@ -9,7 +9,8 @@
 
 
 int main(int argc, char const *argv[]){
-    
+    (void)argc;
+    (void)argv;
     printf("Calling public_test:\n");
     public_test();
     
