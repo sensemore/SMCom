@@ -16,6 +16,8 @@ SMCom requires functions to handle communication channel, which are write & read
 ## API for Python
 
 We provide pip package to download easily on Linux and Windows platforms.
+- Python 3.6-3.9+ versions are supported for Linux, also g++ compiler is required to build the package
+- Python 3.7+ and Python 3.9+ versions are supported for Windows
 
 ```bash
 pip install SMComPy
